@@ -13,5 +13,8 @@
         public DateTime CreatedDate { get; set; }
 
 
+
+        //навигационные свойства
+        public List<Advertisement> Advertisements { get; set; }
     }
 }
