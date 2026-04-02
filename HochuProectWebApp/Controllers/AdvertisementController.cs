@@ -10,10 +10,14 @@ namespace HochuProectWebApp.Controllers
     public class AdvertisementController : ControllerBase
     {
         private IAdvertisementService _advertisementService;
+        private ICategoryService _categoryService;
+        private IUserService _userService;
 
-        public AdvertisementController(IAdvertisementService advertisementService)
+        public AdvertisementController(IAdvertisementService advertisementService, ICategoryService categoryService, IUserService userService)
         {
             _advertisementService = advertisementService;
+            _categoryService = categoryService;
+            _userService = userService;
         }
 
         [HttpGet("all-advertisement")]
