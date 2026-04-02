@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using HochuProectWebApp.Services.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace HochuProectWebApp.Controllers
@@ -7,5 +8,33 @@ namespace HochuProectWebApp.Controllers
     [ApiController]
     public class AdvertisementController : ControllerBase
     {
+        private IAdvertisementService _advertisementService;
+
+        public AdvertisementController(IAdvertisementService advertisementService)
+        {
+            _advertisementService = advertisementService;
+        }
+
+        [HttpGet("all-advertisement")]
+        public IActionResult GetAllAdvertisement()
+        {
+            var advertisements = _advertisementService.GetAllAdvertisements();
+            if (advertisements.Count == 0)
+            {
+                return NotFound(new {Error = "Объявления не найдены"});
+            }
+            return Ok(advertisements);
+        }
+
+        [HttpGet("{categoryName}/advertisements")]
+        public IActionResult GetAdvertisementsByCategory(string categoryName)
+        {
+            var advertisements = _advertisementService.GetAdvertisementsByCategory(categoryName);
+            if (advertisements.Count == 0)
+            {
+                return NotFound(new { Error = "Объявления не найдены" });
+            }
+            return Ok(advertisements);
+        }
     }
 }
