@@ -1,4 +1,5 @@
-﻿using HochuProectWebApp.Services.Interfaces;
+﻿using HochuProectWebApp.Models;
+using HochuProectWebApp.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -35,6 +36,24 @@ namespace HochuProectWebApp.Controllers
                 return NotFound(new { Error = "Объявления не найдены" });
             }
             return Ok(advertisements);
+        }
+
+        [HttpPost("advertisements/add")]
+        public IActionResult AddAdvertisement([FromBody] Advertisement advertisement)
+        {
+            if (advertisement == null)
+            {
+                return BadRequest(new {Error = "Некорректные данные"});
+            }
+
+            if (_advertisementService.AddAdvertisement(advertisement))
+            {
+                return Ok(new { message = "Объявление создано"});
+            }
+            else
+            {
+                return BadRequest(new { Error = "Ошибка добавления" });
+            }
         }
     }
 }
