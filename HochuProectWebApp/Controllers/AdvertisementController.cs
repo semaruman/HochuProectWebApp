@@ -38,15 +38,18 @@ namespace HochuProectWebApp.Controllers
             return Ok(advertisements);
         }
 
-        [HttpPost("advertisements/add")]
-        public IActionResult AddAdvertisement([FromBody] Advertisement advertisement)
+        [HttpPost("{userId}advertisements/add")]
+        public IActionResult AddAdvertisement(
+            [FromRoute] int userId, 
+            [FromQuery] string categoryName,
+            [FromBody] Advertisement advertisement)
         {
             if (advertisement == null)
             {
                 return BadRequest(new {Error = "Некорректные данные"});
             }
 
-            if (_advertisementService.AddAdvertisement(advertisement))
+            if (_advertisementService.AddAdvertisement(advertisement, userId, categoryName))
             {
                 return Ok(new { message = "Объявление создано"});
             }

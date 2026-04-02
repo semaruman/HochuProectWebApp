@@ -10,7 +10,7 @@ namespace HochuProectWebApp.Services.Interfaces
 
         public Advertisement GetAdvertisementById(int id);
 
-        public bool AddAdvertisement(Advertisement advertisement);
+        public bool AddAdvertisement(Advertisement advertisement, int userId, string categoryName);
 
         public bool RemoveAdvertisementById(int id);
 
