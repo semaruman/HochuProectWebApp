@@ -60,10 +60,6 @@ namespace HochuProectWebApp.Data
             {
                 entity.Property(e => e.Title).HasMaxLength(200).IsRequired();
                 entity.Property(e => e.Description).HasMaxLength(3000);
-
-                entity.Property(e => e.Photos)
-                    .HasColumnType("jsonb") 
-                    .HasDefaultValue("[]"); 
             });
         }
     }
