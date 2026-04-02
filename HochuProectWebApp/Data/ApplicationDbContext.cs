@@ -15,6 +15,7 @@ namespace HochuProectWebApp.Data
         {
             var config = new ConfigurationBuilder()
                 .AddJsonFile("appsettings.json")
+                .AddUserSecrets<ApplicationDbContext>()
                 .Build();
 
             string connectionString = config.GetConnectionString("PostgresConnection");
