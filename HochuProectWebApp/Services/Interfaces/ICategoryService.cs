@@ -8,6 +8,6 @@ namespace HochuProectWebApp.Services.Interfaces
 
         public bool AddCategory(Category category);
 
-        public bool RemoveCategory(int categoryId);
+        public bool RemoveCategory(string categoryName);
     }
 }

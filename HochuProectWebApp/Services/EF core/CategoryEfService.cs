@@ -30,11 +30,11 @@ namespace HochuProectWebApp.Services.EF_core
             }
         }
 
-        public bool RemoveCategory(int categoryId)
+        public bool RemoveCategory(string categoryName)
         {
             using var dbContext = new ApplicationDbContext();
 
-            var category = dbContext.Categories.Find(categoryId);
+            var category = dbContext.Categories.FirstOrDefault(c => c.Name == categoryName);
 
             if (category == null)
             {

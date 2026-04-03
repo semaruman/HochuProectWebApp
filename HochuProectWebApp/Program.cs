@@ -1,6 +1,7 @@
 
 using HochuProectWebApp.Services.EF_core;
 using HochuProectWebApp.Services.Interfaces;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,3 +13,14 @@ builder.Services.AddScoped<ICategoryService, CategoryEfService>();
 var app = builder.Build();
 
 app.Run();
+
+IResult GetMenu()
+{
+    return Results.Ok(new
+    {
+        Endpoints = new[]
+        {
+            ""
+        }
+    });
+}

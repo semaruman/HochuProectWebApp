@@ -10,14 +10,10 @@ namespace HochuProectWebApp.Controllers
     public class AdvertisementController : ControllerBase
     {
         private IAdvertisementService _advertisementService;
-        private ICategoryService _categoryService;
-        private IUserService _userService;
 
-        public AdvertisementController(IAdvertisementService advertisementService, ICategoryService categoryService, IUserService userService)
+        public AdvertisementController(IAdvertisementService advertisementService)
         {
             _advertisementService = advertisementService;
-            _categoryService = categoryService;
-            _userService = userService;
         }
 
         [HttpGet("all-advertisement")]
@@ -42,7 +38,7 @@ namespace HochuProectWebApp.Controllers
             return Ok(advertisements);
         }
 
-        [HttpPost("{userId}advertisements/add")]
+        [HttpPost("{userId}/advertisements/add")]
         public IActionResult AddAdvertisement(
             [FromRoute] int userId, 
             [FromQuery] string categoryName,
