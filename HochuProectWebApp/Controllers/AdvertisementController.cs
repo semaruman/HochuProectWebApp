@@ -22,9 +22,20 @@ namespace HochuProectWebApp.Controllers
             var advertisements = _advertisementService.GetAllAdvertisements();
             if (advertisements.Count == 0)
             {
-                return NotFound(new {Error = "Объявления не найдены"});
+                return NotFound(new { Error = "Объявления не найдены" });
             }
-            return Ok(advertisements);
+            return Ok(advertisements.Select(a =>
+            {
+                return new Advertisement
+                {
+                    Id = a.Id,
+                    Title = a.Title,
+                    Photos = a.Photos,
+                    Description = a.Description,
+                    UserId = a.UserId,
+                    CategoryId = a.CategoryId,
+                };
+            }));
         }
 
         [HttpGet("{categoryName}/advertisements")]
@@ -35,23 +46,34 @@ namespace HochuProectWebApp.Controllers
             {
                 return NotFound(new { Error = "Объявления не найдены" });
             }
-            return Ok(advertisements);
+            return Ok(advertisements.Select(a =>
+            {
+                return new Advertisement
+                {
+                    Id = a.Id,
+                    Title = a.Title,
+                    Photos = a.Photos,
+                    Description = a.Description,
+                    UserId = a.UserId,
+                    CategoryId = a.CategoryId,
+                };
+            }));
         }
 
         [HttpPost("{userId}/advertisements/add")]
         public IActionResult AddAdvertisement(
-            [FromRoute] int userId, 
+            [FromRoute] int userId,
             [FromQuery] string categoryName,
             [FromBody] Advertisement advertisement)
         {
             if (advertisement == null)
             {
-                return BadRequest(new {Error = "Некорректные данные"});
+                return BadRequest(new { Error = "Некорректные данные" });
             }
 
             if (_advertisementService.AddAdvertisement(advertisement, userId, categoryName))
             {
-                return Ok(new { message = "Объявление создано"});
+                return Ok(new { message = "Объявление создано" });
             }
             else
             {
