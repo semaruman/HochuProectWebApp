@@ -10,7 +10,7 @@
 
         public string Password { get; set; }
 
-        public string Role { get; set; }
+        public string Role { get; set; } // либо "user", либо "admin"
 
         public DateTime CreatedDate { get; set; } = DateTime.Now;
 
