@@ -1,8 +1,11 @@
 ﻿using HochuProectWebApp.DTOs.User;
 using HochuProectWebApp.Models;
 using HochuProectWebApp.Services.Interfaces;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace HochuProectWebApp.Controllers
 {
@@ -18,7 +21,7 @@ namespace HochuProectWebApp.Controllers
         }
 
         [HttpPost("register")]
-        public IActionResult RegisterUser([FromBody] RegisterDto model)
+        public IActionResult RegisterUser([FromBody] UserRegisterDto model)
         {
             if (!ModelState.IsValid)
             {
@@ -46,6 +49,39 @@ namespace HochuProectWebApp.Controllers
             {
                 return BadRequest(new {Error = "Ошибка регистрации"});
             }
+        }
+
+        [HttpPost("login")]
+        public async Task<IActionResult> LoginUser(string returnUrl, [FromBody] UserLoginDto model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+            
+            var user = _userService.GetUserByEmail(model.Email);
+
+            if (user == null)
+            {
+                return Unauthorized(new { Error = "Пользователь не зарегистрирован" });
+            }
+            
+            if (user.Password != model.Password)
+            {
+                return Unauthorized(new { Error = "Не верный пароль" });
+            }
+
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Email, model.Email),
+                new Claim(ClaimTypes.Role, "user")
+            };
+
+            var claimsIdentity = new ClaimsIdentity(claims, "Cookies");
+
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity));
+
+            return Redirect(returnUrl ?? "/");
         }
     }
 }

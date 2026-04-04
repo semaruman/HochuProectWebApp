@@ -2,7 +2,7 @@
 
 namespace HochuProectWebApp.DTOs.User
 {
-    public class RegisterDto
+    public class UserLoginDto
     {
         [Required]
         [EmailAddress]
@@ -11,8 +11,5 @@ namespace HochuProectWebApp.DTOs.User
         [Required]
         [MinLength(6)]
         public string Password { get; set; }
-
-        [Required, MaxLength(50)]
-        public string Name { get; set; }
     }
 }
