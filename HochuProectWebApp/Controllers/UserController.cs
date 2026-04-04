@@ -83,5 +83,13 @@ namespace HochuProectWebApp.Controllers
 
             return Redirect(returnUrl ?? "/");
         }
+
+        [HttpPost("logout")]
+        public async Task<IActionResult> LogoutUser()
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+            return Redirect("/login");
+        }
     }
 }
