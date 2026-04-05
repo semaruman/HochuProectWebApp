@@ -3,6 +3,7 @@ using HochuProectWebApp.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace HochuProectWebApp.Controllers
 {
@@ -11,10 +12,12 @@ namespace HochuProectWebApp.Controllers
     public class AdvertisementController : ControllerBase
     {
         private IAdvertisementService _advertisementService;
+        private IUserService _userService;
 
-        public AdvertisementController(IAdvertisementService advertisementService)
+        public AdvertisementController(IAdvertisementService advertisementService, IUserService userService)
         {
             _advertisementService = advertisementService;
+            _userService = userService;
         }
 
         [HttpGet("all-advertisement")]
@@ -62,12 +65,14 @@ namespace HochuProectWebApp.Controllers
         }
 
         [Authorize]
-        [HttpPost("{userId}/advertisements/add")]
+        [HttpPost("advertisements/add")]
         public IActionResult AddAdvertisement(
-            [FromRoute] int userId,
             [FromQuery] string categoryName,
             [FromBody] Advertisement advertisement)
         {
+            string email = User.FindFirst(ClaimTypes.Email).Value;
+            int userId = _userService.GetUserByEmail(email).Id;
+
             if (advertisement == null)
             {
                 return BadRequest(new { Error = "Некорректные данные" });
