@@ -13,7 +13,19 @@ builder.Services.AddScoped<ICategoryService, CategoryEfService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options => options.LoginPath = "/login");
 
+//сервисы для сваггера
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    // Включаем генерацию JSON и UI
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
 app.MapControllers();
 app.UseAuthentication();
 app.UseAuthorization();
