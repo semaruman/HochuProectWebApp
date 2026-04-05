@@ -52,7 +52,7 @@ namespace HochuProectWebApp.Controllers
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> LoginUser(string returnUrl, [FromBody] UserLoginDto model)
+        public async Task<IActionResult> LoginUser([FromBody] UserLoginDto model, [FromQuery] string returnUrl = "/")
         {
             if (!ModelState.IsValid)
             {
@@ -81,7 +81,7 @@ namespace HochuProectWebApp.Controllers
 
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity));
 
-            return Redirect(returnUrl ?? "/");
+            return Redirect(returnUrl);
         }
 
         [HttpPost("logout")]
