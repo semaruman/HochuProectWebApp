@@ -14,6 +14,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     .AddCookie(options => options.LoginPath = "/login");
 
 var app = builder.Build();
+app.MapControllers();
 app.UseAuthentication();
 app.UseAuthorization();
 

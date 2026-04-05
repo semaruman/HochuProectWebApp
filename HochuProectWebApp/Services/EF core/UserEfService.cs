@@ -28,6 +28,7 @@ namespace HochuProectWebApp.Services.EF_core
             }
             else
             {
+                user.CreatedDate = user.CreatedDate.ToUniversalTime();
                 dbContext.Users.Add(user);
                 dbContext.SaveChanges();
                 return true;
