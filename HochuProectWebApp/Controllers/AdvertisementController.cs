@@ -1,5 +1,6 @@
 ﻿using HochuProectWebApp.Models;
 using HochuProectWebApp.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -60,6 +61,7 @@ namespace HochuProectWebApp.Controllers
             }));
         }
 
+        [Authorize]
         [HttpPost("{userId}/advertisements/add")]
         public IActionResult AddAdvertisement(
             [FromRoute] int userId,
