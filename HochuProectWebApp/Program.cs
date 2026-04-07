@@ -3,6 +3,8 @@ using HochuProectWebApp.Services.EF_core;
 using HochuProectWebApp.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http.HttpResults;
+using HochuProectWebApp.Middleware;
+using HochuProectWebApp.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,11 +19,20 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+//сервисы для обработки всех исключений
+builder.Services.AddExceptionHandler<ExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
+
+//подключаю обработку исключений
+app.UseExceptionHandler();
+
+//подключаю логгирование всех запросов
+app.UseLoggingMiddleware();
 
 if (app.Environment.IsDevelopment())
 {
-    // Включаем генерацию JSON и UI
     app.UseSwagger();
     app.UseSwaggerUI();
 }
