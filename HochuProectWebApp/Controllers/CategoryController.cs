@@ -1,5 +1,6 @@
 ﻿using HochuProectWebApp.Models;
 using HochuProectWebApp.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,6 +23,7 @@ namespace HochuProectWebApp.Controllers
             return Ok(_categoryService.GetCategories().Select(c => c.Name));
         }
 
+        [Authorize(Roles = "admin")]
         [HttpPost("add")]
         public IActionResult AddCategory([FromQuery] string categoryName)
         {
@@ -41,6 +43,7 @@ namespace HochuProectWebApp.Controllers
             }
         }
 
+        [Authorize(Roles = "admin")]
         [HttpPost("remove")]
         public IActionResult RemoveCategory(string categoryName)
         {
