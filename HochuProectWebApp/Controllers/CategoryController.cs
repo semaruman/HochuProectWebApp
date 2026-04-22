@@ -11,10 +11,12 @@ namespace HochuProectWebApp.Controllers
     public class CategoryController : ControllerBase
     {
         private ICategoryService _categoryService;
+        private ILogger<CategoryController> _logger;
 
-        public CategoryController(ICategoryService categoryService)
+        public CategoryController(ICategoryService categoryService, ILogger<CategoryController> logger)
         {
             _categoryService = categoryService;
+            _logger = logger;
         }
 
         [HttpGet("categories")]
@@ -29,16 +31,19 @@ namespace HochuProectWebApp.Controllers
         {
             if (string.IsNullOrEmpty(categoryName))
             {
+                _logger.LogWarning("Отсутствует название категории");
                 return BadRequest(new {Error = "Отсутствует название категории"});
             }
 
             var category = new Category { Name = categoryName };
             if (_categoryService.AddCategory(category))
             {
+                _logger.LogInformation($"Категория '{categoryName}' добавлена успешно!");
                 return Ok(new {Message = $"Категория '{categoryName}' добавлена успешно!"});
             }
             else
             {
+                _logger.LogWarning("Ошибка при добавлении категории");
                 return BadRequest(new { Error = "Ошибка при добавлении категории" });
             }
         }
