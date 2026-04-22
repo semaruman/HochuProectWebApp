@@ -23,7 +23,7 @@ namespace HochuProectWebApp.Middleware
                 );
             await _next(httpContext);
 
-            _logger.LogInformation("Получен ответ. Статус: {status}", httpContext.Response.StatusCode);
+            _logger.LogInformation("Получен ответ(путь: {path}). Статус: {status}", httpContext.Request.Path, httpContext.Response.StatusCode);
         }
     }
 
