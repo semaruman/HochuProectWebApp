@@ -13,11 +13,16 @@ namespace HochuProectWebApp.Controllers
     {
         private IAdvertisementService _advertisementService;
         private IUserService _userService;
+        private ILogger<AdvertisementController> _logger;
 
-        public AdvertisementController(IAdvertisementService advertisementService, IUserService userService)
+        public AdvertisementController(
+            IAdvertisementService advertisementService, 
+            IUserService userService, 
+            ILogger<AdvertisementController> logger)
         {
             _advertisementService = advertisementService;
             _userService = userService;
+            _logger = logger;
         }
 
         [HttpGet("all-advertisement")]
@@ -26,6 +31,7 @@ namespace HochuProectWebApp.Controllers
             var advertisements = _advertisementService.GetAllAdvertisements();
             if (advertisements.Count == 0)
             {
+                _logger.LogWarning($"{nameof(GetAllAdvertisement)}: объявления не найдены");
                 return NotFound(new { Error = "Объявления не найдены" });
             }
             return Ok(advertisements.Select(a =>
