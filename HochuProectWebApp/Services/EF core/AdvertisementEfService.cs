@@ -78,9 +78,9 @@ namespace HochuProectWebApp.Services.EF_core
                 return false;
             }
 
-
-            advertisement.User = user;
             advertisement.Category = category;
+            user.Advertisements.Add(advertisement);
+            
 
             dbContext.SaveChanges();
 

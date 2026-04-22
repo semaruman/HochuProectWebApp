@@ -74,7 +74,7 @@ namespace HochuProectWebApp.Controllers
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Email, model.Email),
-                new Claim(ClaimTypes.Role, "user")
+                new Claim(ClaimTypes.Role, user.Role)
             };
 
             var claimsIdentity = new ClaimsIdentity(claims, "Cookies");
