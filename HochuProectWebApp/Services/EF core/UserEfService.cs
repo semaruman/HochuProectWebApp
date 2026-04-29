@@ -22,16 +22,23 @@ namespace HochuProectWebApp.Services.EF_core
         public bool AddUser(User user)
         {
             using var dbContext = new ApplicationDbContext();
-            if (dbContext.Users.Select(u => u.Email).Contains(user.Email))
+            try
+            {
+                if (dbContext.Users.Select(u => u.Email).Contains(user.Email))
+                {
+                    return false;
+                }
+                else
+                {
+                    user.CreatedDate = user.CreatedDate.ToUniversalTime();
+                    dbContext.Users.Add(user);
+                    dbContext.SaveChanges();
+                    return true;
+                }
+            }
+            catch
             {
                 return false;
-            }
-            else
-            {
-                user.CreatedDate = user.CreatedDate.ToUniversalTime();
-                dbContext.Users.Add(user);
-                dbContext.SaveChanges();
-                return true;
             }
         }
 
