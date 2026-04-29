@@ -79,6 +79,9 @@ namespace HochuProectWebApp.Controllers
             string email = User.FindFirst(ClaimTypes.Email).Value;
             int userId = _userService.GetUserByEmail(email).Id;
 
+            _logger.LogInformation("Добавление объявления по категории {categName}, пользователя с ID={id}.",
+                categoryName, userId
+                );
             if (advertisement == null)
             {
                 return BadRequest(new { Error = "Некорректные данные" });
