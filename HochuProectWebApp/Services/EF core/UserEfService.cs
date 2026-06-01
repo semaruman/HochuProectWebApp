@@ -1,62 +1,65 @@
 ﻿using HochuProectWebApp.Data;
+using HochuProectWebApp.Data.UnitOfWork;
+using HochuProectWebApp.DTOs.User;
 using HochuProectWebApp.Models;
 using HochuProectWebApp.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace HochuProectWebApp.Services.EF_core
 {
     public class UserEfService : IUserService
     {
-        public User GetUserById(int userId)
+        private readonly IUnitOfWork _unitOfWork;
+
+        public UserEfService(IUnitOfWork unitOfWork)
         {
-            using var dbContext = new ApplicationDbContext();
-            return dbContext.Users.Find(userId);
+            _unitOfWork = unitOfWork;
         }
 
-        public User GetUserByEmail(string email)
+        public async Task<IServiceResult<User>> RegisterUser(UserRegisterDto model)
         {
-            using var dbContext = new ApplicationDbContext();
-            return dbContext.Users.AsNoTracking().FirstOrDefault(u => u.Email == email);
-        }
-
-        public bool AddUser(User user)
-        {
-            using var dbContext = new ApplicationDbContext();
-            try
+            if (_unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == model.Email) != null)
             {
-                if (dbContext.Users.Select(u => u.Email).Contains(user.Email))
-                {
-                    return false;
-                }
-                else
-                {
-                    user.CreatedDate = user.CreatedDate.ToUniversalTime();
-                    dbContext.Users.Add(user);
-                    dbContext.SaveChanges();
-                    return true;
-                }
+                return ServiceResult<User>.Fail($"Пользователь с email: {model.Email} уже существует");
             }
-            catch
+
+            var user = new User
             {
-                return false;
-            }
+                Name = model.Name,
+                Email = model.Email,
+                Password = model.Password,
+                Role = "user"
+            };
+
+            _unitOfWork.Users.Add(user);
+            await _unitOfWork.SavaChangesAsync();
+            return ServiceResult<User>.Success(user);
         }
 
-        public bool RemoveUser(int userId)
+        public async Task<IServiceResult<ClaimsIdentity>> LoginUser(UserLoginDto model)
         {
-            using var dbContext = new ApplicationDbContext();
-            var user = dbContext.Users.Find(userId);
+            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
 
             if (user == null)
             {
-                return false;
+                return ServiceResult<ClaimsIdentity>.Fail("Пользователь не зарегистрирован");
             }
-            else
+
+            if (user.Password != model.Password)
             {
-                dbContext.Remove(user);
-                dbContext.SaveChanges();
-                return true;
+                return ServiceResult<ClaimsIdentity>.Fail("Неверный пароль");
             }
+
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Email, model.Email),
+                new Claim(ClaimTypes.Role, user.Role)
+            };
+
+            var claimsIdentity = new ClaimsIdentity(claims, "Cookies");
+
+            return ServiceResult<ClaimsIdentity>.Success(claimsIdentity);
         }
     }
 }

@@ -77,7 +77,7 @@ namespace HochuProectWebApp.Controllers
             [FromBody] Advertisement advertisement)
         {
             string email = User.FindFirst(ClaimTypes.Email).Value;
-            int userId = _userService.GetUserByEmail(email).Id;
+            int userId = 0;//_userService.GetUserByEmail(email).Id;
 
             _logger.LogInformation("Добавление объявления по категории {categName}, пользователя с ID={id}.",
                 categoryName, userId

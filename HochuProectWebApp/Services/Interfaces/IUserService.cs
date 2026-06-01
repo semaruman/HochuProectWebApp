@@ -1,15 +1,13 @@
-﻿using HochuProectWebApp.Models;
+﻿using HochuProectWebApp.DTOs.User;
+using HochuProectWebApp.Models;
+using System.Security.Claims;
 
 namespace HochuProectWebApp.Services.Interfaces
 {
     public interface IUserService
     {
-        public User GetUserById(int userId);
+        Task<IServiceResult<User>> RegisterUser(UserRegisterDto model);
 
-        public User GetUserByEmail(string email);
-
-        public bool AddUser(User user);
-
-        public bool RemoveUser(int userId);
+        Task<IServiceResult<ClaimsIdentity>> LoginUser(UserLoginDto model);
     }
 }
