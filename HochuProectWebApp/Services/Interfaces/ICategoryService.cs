@@ -4,7 +4,7 @@ namespace HochuProectWebApp.Services.Interfaces
 {
     public interface ICategoryService
     {
-        public List<Category> GetCategories();
+        public Task<IServiceResult<List<string>>> GetCategoryNames();
 
         public bool AddCategory(Category category);
 

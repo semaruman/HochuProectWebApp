@@ -20,9 +20,15 @@ namespace HochuProectWebApp.Controllers
         }
 
         [HttpGet("categories")]
-        public IActionResult GetCategories()
+        public async Task<IActionResult> GetCategoryNames()
         {
-            return Ok(_categoryService.GetCategories().Select(c => c.Name));
+            var result = await _categoryService.GetCategoryNames();
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result.ErrorMessage);
+            }
+
+            return Ok(result.Value);
         }
 
         [Authorize(Roles = "admin")]

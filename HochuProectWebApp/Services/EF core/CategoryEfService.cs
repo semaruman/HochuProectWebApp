@@ -1,4 +1,5 @@
 ﻿using HochuProectWebApp.Data;
+using HochuProectWebApp.Data.UnitOfWork;
 using HochuProectWebApp.Models;
 using HochuProectWebApp.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -7,11 +8,25 @@ namespace HochuProectWebApp.Services.EF_core
 {
     public class CategoryEfService : ICategoryService
     {
-        public List<Category> GetCategories()
+        private ILogger<CategoryEfService> _logger;
+        private readonly IUnitOfWork _unitOfWork;
+        public CategoryEfService(ILogger<CategoryEfService> logger, IUnitOfWork unitOfWork)
         {
-            using var dbContext = new ApplicationDbContext(null);
+            _logger = logger;
+            _unitOfWork = unitOfWork;
+        }
 
-            return dbContext.Categories.AsNoTracking().ToList();
+        public async Task<IServiceResult<List<string>>> GetCategoryNames()
+        {
+            var categories = await _unitOfWork.Categories.GetAllAsync();
+            if (categories == null || categories.Count == 0)
+            {
+                return ServiceResult<List<string>>.Fail("Категории не найдены");
+            }
+            
+            var categoryNames = categories.Select(c => c.Name).ToList();
+
+            return ServiceResult<List<string>>.Success(categoryNames);
         }
 
         public bool AddCategory(Category category)
