@@ -4,16 +4,11 @@ namespace HochuProectWebApp.Services.Interfaces
 {
     public interface IAdvertisementService
     {
-        public List<Advertisement> GetAllAdvertisements();
+        public Task<IServiceResult<List<Advertisement>>> GetAllAdvertisements();
 
-        public List<Advertisement> GetAdvertisementsByCategory(string categoryName);
-
-        public Advertisement GetAdvertisementById(int id);
-
-        public bool AddAdvertisement(Advertisement advertisement, int userId, string categoryName);
-
-        public bool RemoveAdvertisementById(int id);
+        public Task<IServiceResult<List<Advertisement>>> GetAdvertisementsByCategory(string categoryName);
 
 
+        public Task<IServiceResult<Advertisement>> AddAdvertisement(string userEmail, string categoryName, Advertisement advertisement);
     }
 }

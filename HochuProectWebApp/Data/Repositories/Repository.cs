@@ -19,16 +19,16 @@ namespace HochuProectWebApp.Data.Repositories
             return await _dbSet.FindAsync(id);
         }
 
-        public async Task<HashSet<T>> GetAllAsync()
+        public async Task<List<T>> GetAllAsync()
         {
             var res = await _dbSet.ToListAsync();
-            return res.ToHashSet();
+            return res;
         }
 
-        public async Task<HashSet<T>> FindAsync(Expression<Func<T, bool>> predicate)
+        public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate)
         {
             var res = await _dbSet.Where(predicate).ToListAsync();
-            return res.ToHashSet();
+            return res;
         }
 
         public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate)

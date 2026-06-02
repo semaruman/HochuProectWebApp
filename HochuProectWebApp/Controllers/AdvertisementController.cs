@@ -12,89 +12,56 @@ namespace HochuProectWebApp.Controllers
     public class AdvertisementController : ControllerBase
     {
         private IAdvertisementService _advertisementService;
-        private IUserService _userService;
         private ILogger<AdvertisementController> _logger;
 
         public AdvertisementController(
             IAdvertisementService advertisementService, 
-            IUserService userService, 
             ILogger<AdvertisementController> logger)
         {
             _advertisementService = advertisementService;
-            _userService = userService;
             _logger = logger;
         }
 
         [HttpGet("all-advertisement")]
-        public IActionResult GetAllAdvertisement()
+        public async Task<IActionResult> GetAllAdvertisements()
         {
-            var advertisements = _advertisementService.GetAllAdvertisements();
-            if (advertisements.Count == 0)
+            var result = await _advertisementService.GetAllAdvertisements();
+            if (!result.IsSuccess)
             {
-                _logger.LogWarning($"{nameof(GetAllAdvertisement)}: объявления не найдены");
-                return NotFound(new { Error = "Объявления не найдены" });
+                return BadRequest(result.ErrorMessage);
             }
-            return Ok(advertisements.Select(a =>
-            {
-                return new Advertisement
-                {
-                    Id = a.Id,
-                    Title = a.Title,
-                    Photos = a.Photos,
-                    Description = a.Description,
-                    UserId = a.UserId,
-                    CategoryId = a.CategoryId,
-                };
-            }));
+
+            return Ok(result.Value);
         }
 
         [HttpGet("{categoryName}/advertisements")]
-        public IActionResult GetAdvertisementsByCategory(string categoryName)
+        public async Task<IActionResult> GetAdvertisementsByCategory(string categoryName)
         {
-            var advertisements = _advertisementService.GetAdvertisementsByCategory(categoryName);
-            if (advertisements.Count == 0)
+            var result = await _advertisementService.GetAdvertisementsByCategory(categoryName);
+
+            if (!result.IsSuccess)
             {
-                return NotFound(new { Error = "Объявления не найдены" });
+                return BadRequest(result.ErrorMessage);
             }
-            return Ok(advertisements.Select(a =>
-            {
-                return new Advertisement
-                {
-                    Id = a.Id,
-                    Title = a.Title,
-                    Photos = a.Photos,
-                    Description = a.Description,
-                    UserId = a.UserId,
-                    CategoryId = a.CategoryId,
-                };
-            }));
+
+            return Ok(result.Value);
         }
 
         [Authorize]
         [HttpPost("advertisements/add")]
-        public IActionResult AddAdvertisement(
+        public async Task<IActionResult> AddAdvertisement(
             [FromQuery] string categoryName,
             [FromBody] Advertisement advertisement)
         {
             string email = User.FindFirst(ClaimTypes.Email).Value;
-            int userId = 0;//_userService.GetUserByEmail(email).Id;
+            var result = await _advertisementService.AddAdvertisement(email, categoryName, advertisement);
 
-            _logger.LogInformation("Добавление объявления по категории {categName}, пользователя с ID={id}.",
-                categoryName, userId
-                );
-            if (advertisement == null)
+            if (!result.IsSuccess)
             {
-                return BadRequest(new { Error = "Некорректные данные" });
+                return BadRequest(result.ErrorMessage);
             }
 
-            if (_advertisementService.AddAdvertisement(advertisement, userId, categoryName))
-            {
-                return Ok(new { message = "Объявление создано" });
-            }
-            else
-            {
-                return BadRequest(new { Error = "Ошибка добавления" });
-            }
+            return Ok(result.Value);
         }
     }
 }

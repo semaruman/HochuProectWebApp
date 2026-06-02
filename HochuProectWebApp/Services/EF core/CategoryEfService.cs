@@ -9,14 +9,14 @@ namespace HochuProectWebApp.Services.EF_core
     {
         public List<Category> GetCategories()
         {
-            using var dbContext = new ApplicationDbContext();
+            using var dbContext = new ApplicationDbContext(null);
 
             return dbContext.Categories.AsNoTracking().ToList();
         }
 
         public bool AddCategory(Category category)
         {
-            using var dbContext = new ApplicationDbContext();
+            using var dbContext = new ApplicationDbContext(null);
 
             if (dbContext.Categories.Select(c => c.Name).Contains(category.Name))
             {
@@ -32,7 +32,7 @@ namespace HochuProectWebApp.Services.EF_core
 
         public bool RemoveCategory(string categoryName)
         {
-            using var dbContext = new ApplicationDbContext();
+            using var dbContext = new ApplicationDbContext(null);
 
             var category = dbContext.Categories.FirstOrDefault(c => c.Name == categoryName);
 

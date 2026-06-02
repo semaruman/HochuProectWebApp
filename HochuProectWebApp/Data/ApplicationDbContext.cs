@@ -11,6 +11,12 @@ namespace HochuProectWebApp.Data
 
         public DbSet<Category> Categories { get; set; }
 
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+        : base(options)
+        {
+
+        }
+
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             var config = new ConfigurationBuilder()
