@@ -29,19 +29,26 @@ namespace HochuProectWebApp.Services.EF_core
             return ServiceResult<List<string>>.Success(categoryNames);
         }
 
-        public bool AddCategory(Category category)
+        public async Task<IServiceResult<bool>> AddCategory(string categoryName)
         {
-            using var dbContext = new ApplicationDbContext(null);
-
-            if (dbContext.Categories.Select(c => c.Name).Contains(category.Name))
+            if (string.IsNullOrWhiteSpace(categoryName))
             {
-                return false;
+                _logger.LogWarning("Отсутствует название категории");
+                return ServiceResult<bool>.Fail("Отсутствует название категории");
+            }
+
+            var foundCategory = _unitOfWork.Categories.FirstOrDefaultAsync(c => c.Name == categoryName);
+
+            if (foundCategory != null)
+            {
+                return ServiceResult<bool>.Fail("Категория уже существует");
             }
             else
             {
-                dbContext.Categories.Add(category);
-                dbContext.SaveChanges();
-                return true;
+                _unitOfWork.Categories.Add(new Category { Name = categoryName});
+                
+                await _unitOfWork.SaveChangesAsync();
+                return ServiceResult<bool>.Success(true);
             }
         }
 

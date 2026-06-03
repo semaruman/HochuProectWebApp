@@ -6,7 +6,7 @@ namespace HochuProectWebApp.Services.Interfaces
     {
         public Task<IServiceResult<List<string>>> GetCategoryNames();
 
-        public bool AddCategory(Category category);
+        public Task<IServiceResult<bool>> AddCategory(string categoryName);
 
         public bool RemoveCategory(string categoryName);
     }

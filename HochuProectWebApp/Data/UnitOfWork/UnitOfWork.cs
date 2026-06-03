@@ -23,7 +23,7 @@ namespace HochuProectWebApp.Data.UnitOfWork
             Advertisements = new Repository<Advertisement>(_context);
         }
 
-        public async Task<int> SavaChangesAsync()
+        public async Task<int> SaveChangesAsync()
         {
             return await _context.SaveChangesAsync();
         }

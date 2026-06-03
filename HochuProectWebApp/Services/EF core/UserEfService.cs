@@ -33,7 +33,7 @@ namespace HochuProectWebApp.Services.EF_core
             };
 
             _unitOfWork.Users.Add(user);
-            await _unitOfWork.SavaChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return ServiceResult<User>.Success(user);
         }
 

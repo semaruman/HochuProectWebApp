@@ -33,16 +33,12 @@ namespace HochuProectWebApp.Controllers
 
         [Authorize(Roles = "admin")]
         [HttpPost("add")]
-        public IActionResult AddCategory([FromQuery] string categoryName)
+        public async Task<IActionResult> AddCategory([FromQuery] string categoryName)
         {
-            if (string.IsNullOrEmpty(categoryName))
-            {
-                _logger.LogWarning("Отсутствует название категории");
-                return BadRequest(new {Error = "Отсутствует название категории"});
-            }
+            
 
-            var category = new Category { Name = categoryName };
-            if (_categoryService.AddCategory(category))
+            var result = await _categoryService.AddCategory(categoryName);
+            if (result.IsSuccess)
             {
                 _logger.LogInformation($"Категория '{categoryName}' добавлена успешно!");
                 return Ok(new {Message = $"Категория '{categoryName}' добавлена успешно!"});
@@ -50,7 +46,7 @@ namespace HochuProectWebApp.Controllers
             else
             {
                 _logger.LogWarning("Ошибка при добавлении категории");
-                return BadRequest(new { Error = "Ошибка при добавлении категории" });
+                return BadRequest(result.ErrorMessage);
             }
         }
 

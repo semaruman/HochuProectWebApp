@@ -11,7 +11,7 @@ namespace HochuProectWebApp.Data.UnitOfWork
 
         IRepository<Advertisement> Advertisements { get; }
 
-        Task<int> SavaChangesAsync();
+        Task<int> SaveChangesAsync();
 
         Task BeginTransactionAsync();
 
