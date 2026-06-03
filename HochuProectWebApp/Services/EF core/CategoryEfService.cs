@@ -52,20 +52,23 @@ namespace HochuProectWebApp.Services.EF_core
             }
         }
 
-        public bool RemoveCategory(string categoryName)
+        public async Task<IServiceResult<bool>> RemoveCategory(string categoryName)
         {
-            using var dbContext = new ApplicationDbContext(null);
+            if (string.IsNullOrWhiteSpace(categoryName))
+            {
+                return ServiceResult<bool>.Fail("Отсутствует название категории");
+            }
 
-            var category = dbContext.Categories.FirstOrDefault(c => c.Name == categoryName);
+            var category = await _unitOfWork.Categories.FirstOrDefaultAsync(c => c.Name == categoryName);
 
             if (category == null)
             {
-                return false;
+                return ServiceResult<bool>.Fail("Категория не найдена");
             }
             else
             {
-                dbContext.Categories.Remove(category);
-                return true;
+                _unitOfWork.Categories.Remove(category);
+                return ServiceResult<bool>.Success(true);
             }
         }
     }

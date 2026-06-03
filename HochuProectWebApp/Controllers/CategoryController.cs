@@ -52,20 +52,16 @@ namespace HochuProectWebApp.Controllers
 
         [Authorize(Roles = "admin")]
         [HttpPost("remove")]
-        public IActionResult RemoveCategory(string categoryName)
+        public async Task<IActionResult> RemoveCategory(string categoryName)
         {
-            if (string.IsNullOrEmpty(categoryName))
+            var result = await _categoryService.RemoveCategory(categoryName);
+            if (result.IsSuccess)
             {
-                return BadRequest(new { Error = "Отсутствует название категории" });
-            }
-
-            if (_categoryService.RemoveCategory(categoryName))
-            {
-                return Ok(new { Message = $"Категория '{categoryName}' удалена" });
+                return Ok($"Категория '{categoryName}' удалена");
             }
             else
             {
-                return BadRequest(new { Error = "Ошибка при удалении категории" });
+                return BadRequest(result.ErrorMessage);
             }
         }
     }

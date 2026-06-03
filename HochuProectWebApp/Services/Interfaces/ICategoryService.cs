@@ -8,6 +8,6 @@ namespace HochuProectWebApp.Services.Interfaces
 
         public Task<IServiceResult<bool>> AddCategory(string categoryName);
 
-        public bool RemoveCategory(string categoryName);
+        public Task<IServiceResult<bool>> RemoveCategory(string categoryName);
     }
 }
