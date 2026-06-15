@@ -1,7 +1,6 @@
-﻿using HochuProectWebApp.Models;
-using HochuProectWebApp.Services.Interfaces;
+﻿using HochuProect.Application.IServices;
+using HochuProect.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 

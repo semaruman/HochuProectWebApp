@@ -1,9 +1,7 @@
-﻿using HochuProectWebApp.DTOs.User;
-using HochuProectWebApp.Models;
-using HochuProectWebApp.Services.Interfaces;
+﻿using HochuProect.Application.DTOs.User;
+using HochuProect.Application.IServices;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 

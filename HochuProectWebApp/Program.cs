@@ -1,13 +1,13 @@
-
-using HochuProectWebApp.Data;
-using HochuProectWebApp.Data.Repositories;
-using HochuProectWebApp.Data.UnitOfWork;
+using HochuProect.Application.IRepositories;
+using HochuProect.Application.IServices;
+using HochuProect.Application.IUnitOfWork;
+using HochuProect.Infrastructure.Data;
+using HochuProect.Infrastructure.Repositories;
+using HochuProect.Infrastructure.Services;
+using HochuProect.Infrastructure.UnitOfWork;
 using HochuProectWebApp.Infrastructure;
 using HochuProectWebApp.Middleware;
-using HochuProectWebApp.Services.EF_core;
-using HochuProectWebApp.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
