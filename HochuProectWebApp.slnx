@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="HochuProect.Application/HochuProect.Application.csproj" Id="7ebbe888-659d-46d5-b961-c0d0ef8e2680" />
   <Project Path="HochuProect.Domain/HochuProect.Domain.csproj" Id="b2bb37c3-c411-4992-a56f-d155995e565f" />
+  <Project Path="HochuProect.Infrastructure/HochuProect.Infrastructure.csproj" Id="4ffa22ea-42fe-43d4-8f3a-482d5b8d7f5e" />
   <Project Path="HochuProectWebApp/HochuProectWebApp.csproj" />
 </Solution>
