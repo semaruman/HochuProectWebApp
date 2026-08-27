@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Профиль — Хочу Проект</title>
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+  <main class="main">
+    <div class="wrap" style="max-width:720px">
+      <div class="page-head">
+        <div>
+          <h1>Профиль</h1>
+          <p>Как вас видят заказчики и исполнители.</p>
+        </div>
+      </div>
+      <div id="content"><div class="skeleton"></div></div>
+    </div>
+  </main>
+  <footer class="site-footer" id="site-footer"></footer>
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    (async () => {
+      await HochuApp.mountShell({ active: "profile" });
+      if (!HochuApp.requireAuthOrRedirect()) return;
+      const root = document.getElementById("content");
+      try {
+        const profile = await HochuApi.get("/api/profiles/me");
+        root.innerHTML = `
+          <form class="panel" id="form">
+            <div class="field">
+              <label class="label" for="displayName">Отображаемое имя</label>
+              <input class="input" id="displayName" value="${HochuApp.escapeHtml(profile.displayName || "")}" required />
+            </div>
+            <div class="field">
+              <label class="label" for="bio">О себе</label>
+              <textarea class="textarea" id="bio">${HochuApp.escapeHtml(profile.bio || "")}</textarea>
+            </div>
+            <div class="item__meta" style="margin-bottom:1rem">
+              <span>Рейтинг: <strong>${profile.averageRating ?? "—"}</strong></span>
+              <span>Отзывов: <strong>${profile.reviewCount ?? 0}</strong></span>
+              <span>${HochuApp.escapeHtml(profile.email || "")}</span>
+            </div>
+            <p class="error-text" id="error" hidden></p>
+            <button class="btn btn-primary" type="submit" id="submit">Сохранить</button>
+          </form>`;
+
+        document.getElementById("form").addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const error = document.getElementById("error");
+          const btn = document.getElementById("submit");
+          error.hidden = true;
+          HochuApp.setBusy(btn, true);
+          try {
+            await HochuApi.put("/api/profiles/me", {
+              displayName: document.getElementById("displayName").value.trim(),
+              bio: document.getElementById("bio").value.trim() || null
+            });
+            HochuApp.toast("Профиль обновлён");
+            HochuApp.setBusy(btn, false);
+          } catch (err) {
+            error.textContent = err.message;
+            error.hidden = false;
+            HochuApp.setBusy(btn, false);
+          }
+        });
+      } catch (err) {
+        root.innerHTML = `<div class="empty">${HochuApp.escapeHtml(err.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

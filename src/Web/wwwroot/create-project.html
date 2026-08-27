@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Создать проект — Хочу Проект</title>
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+  <main class="main">
+    <div class="wrap" style="max-width:720px">
+      <div class="page-head">
+        <div>
+          <h1>Новый проект</h1>
+          <p>Опишите задачу так, чтобы инженеру было понятно ТЗ.</p>
+        </div>
+      </div>
+      <form class="panel" id="form">
+        <div class="field">
+          <label class="label" for="title">Название</label>
+          <input class="input" id="title" required minlength="5" maxlength="200" placeholder="3D-модель корпуса оборудования" />
+        </div>
+        <div class="field">
+          <label class="label" for="description">Описание</label>
+          <textarea class="textarea" id="description" required minlength="20" maxlength="10000"
+            placeholder="Нужна параметрическая модель по чертежам с допусками и STEP-файлом."></textarea>
+        </div>
+        <div class="field">
+          <label class="label" for="categoryId">Категория</label>
+          <select class="select" id="categoryId" required></select>
+        </div>
+        <div class="row">
+          <div class="field" style="flex:1;min-width:140px">
+            <label class="label" for="budgetAmount">Бюджет, ₽</label>
+            <input class="input" id="budgetAmount" type="number" min="1" step="1" required />
+          </div>
+          <div class="field" style="flex:1;min-width:140px">
+            <label class="label" for="deadline">Дедлайн</label>
+            <input class="input" id="deadline" type="date" required />
+          </div>
+        </div>
+        <p class="error-text" id="error" hidden></p>
+        <div class="row">
+          <button class="btn btn-primary" type="submit" id="submit">Создать черновик</button>
+          <label class="hint" style="display:flex;gap:0.4rem;align-items:center">
+            <input type="checkbox" id="publish" checked /> Сразу опубликовать
+          </label>
+        </div>
+      </form>
+    </div>
+  </main>
+  <footer class="site-footer" id="site-footer"></footer>
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    (async () => {
+      await HochuApp.mountShell({ active: "projects" });
+      if (!HochuApp.requireAuthOrRedirect()) return;
+
+      const cats = await HochuApi.get("/api/categories");
+      document.getElementById("categoryId").innerHTML =
+        cats.map(c => `<option value="${c.id}">${HochuApp.escapeHtml(c.name)}</option>`).join("");
+
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 14);
+      document.getElementById("deadline").value = tomorrow.toISOString().slice(0, 10);
+
+      document.getElementById("form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const error = document.getElementById("error");
+        const btn = document.getElementById("submit");
+        error.hidden = true;
+        HochuApp.setBusy(btn, true);
+        try {
+          const body = {
+            title: document.getElementById("title").value.trim(),
+            description: document.getElementById("description").value.trim(),
+            categoryId: document.getElementById("categoryId").value,
+            budgetAmount: Number(document.getElementById("budgetAmount").value),
+            deadline: document.getElementById("deadline").value
+          };
+          const project = await HochuApi.post("/api/projects", body);
+          if (document.getElementById("publish").checked) {
+            await HochuApi.post(`/api/projects/${project.id}/publish`);
+          }
+          location.href = `/project.html?id=${project.id}`;
+        } catch (err) {
+          error.textContent = err.message;
+          error.hidden = false;
+          HochuApp.setBusy(btn, false);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Сделки — Хочу Проект</title>
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+  <main class="main">
+    <div class="wrap">
+      <div class="page-head">
+        <div>
+          <h1>Мои сделки</h1>
+          <p>Активные и завершённые работы.</p>
+        </div>
+      </div>
+      <div class="list" id="list"><div class="skeleton"></div></div>
+    </div>
+  </main>
+  <footer class="site-footer" id="site-footer"></footer>
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    (async () => {
+      await HochuApp.mountShell({ active: "deals" });
+      if (!HochuApp.requireAuthOrRedirect()) return;
+      const list = document.getElementById("list");
+      try {
+        const deals = await HochuApi.get("/api/deals/mine");
+        if (!deals.length) {
+          list.innerHTML = `<div class="empty">Сделок пока нет. Примите отклик на проект.</div>`;
+          return;
+        }
+        list.innerHTML = deals.map(d => `
+          <a class="item" href="/deal.html?id=${d.id}">
+            <div class="item__title">${HochuApp.escapeHtml(d.projectTitle || "Сделка")}</div>
+            <div class="item__meta">
+              ${HochuApp.statusBadge(HochuApp.DEAL_STATUS, d.status, true)}
+              <span>${HochuApp.money(d.amount)}</span>
+              <span>${HochuApp.formatDate(d.createdAt)}</span>
+            </div>
+          </a>`).join("");
+      } catch (err) {
+        list.innerHTML = `<div class="empty">${HochuApp.escapeHtml(err.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

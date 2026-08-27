@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Проект — Хочу Проект</title>
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+  <main class="main">
+    <div class="wrap">
+      <div id="content"><div class="skeleton"></div></div>
+    </div>
+  </main>
+  <footer class="site-footer" id="site-footer"></footer>
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    const id = HochuApp.qs("id");
+
+    async function load() {
+      const root = document.getElementById("content");
+      if (!id) {
+        root.innerHTML = `<div class="empty">Не указан id проекта.</div>`;
+        return;
+      }
+      try {
+        const project = await HochuApi.get(`/api/projects/${id}`);
+        const userId = HochuApp.getUserId();
+        const isOwner = userId && project.buyerId === userId;
+        const canBid = userId && !isOwner && (project.status === 1 || project.status === "Published");
+
+        let actions = `<a class="btn btn-ghost" href="/projects.html">К списку</a>`;
+        if (isOwner && (project.status === 0 || project.status === "Draft")) {
+          actions += ` <button class="btn btn-primary" id="publish" type="button">Опубликовать</button>`;
+        }
+        if (isOwner && (project.status === 1 || project.status === "Published" || project.status === 2 || project.status === "InProgress")) {
+          actions += ` <button class="btn btn-ghost" id="show-bids" type="button">Отклики</button>`;
+        }
+
+        root.innerHTML = `
+          <div class="page-head">
+            <div>
+              <h1>${HochuApp.escapeHtml(project.title)}</h1>
+              <p>${HochuApp.statusBadge(HochuApp.PROJECT_STATUS, project.status)} · ${HochuApp.escapeHtml(project.category?.name || "")}</p>
+            </div>
+            <div class="row">${actions}</div>
+          </div>
+          <div class="split split-2">
+            <div class="panel">
+              <h2>Описание</h2>
+              <p style="white-space:pre-wrap;margin:0">${HochuApp.escapeHtml(project.description)}</p>
+            </div>
+            <div class="stack">
+              <div class="panel">
+                <h3>Условия</h3>
+                <div class="item__meta">
+                  <span>Бюджет: <strong>${HochuApp.money(project.budgetAmount, project.currency)}</strong></span>
+                  <span>Дедлайн: <strong>${HochuApp.escapeHtml(project.deadline)}</strong></span>
+                  <span>Создан: ${HochuApp.formatDate(project.createdAt)}</span>
+                </div>
+              </div>
+              ${canBid ? `
+              <div class="panel" id="bid-panel">
+                <h3>Откликнуться</h3>
+                <div class="field">
+                  <label class="label" for="price">Цена, ₽</label>
+                  <input class="input" id="price" type="number" min="1" required />
+                </div>
+                <div class="field">
+                  <label class="label" for="days">Срок, дней</label>
+                  <input class="input" id="days" type="number" min="1" value="7" required />
+                </div>
+                <div class="field">
+                  <label class="label" for="letter">Сопроводительное письмо</label>
+                  <textarea class="textarea" id="letter" minlength="20" placeholder="Опишите подход, инструменты и опыт (мин. 20 символов)"></textarea>
+                </div>
+                <p class="error-text" id="bid-error" hidden></p>
+                <button class="btn btn-primary" id="bid-submit" type="button">Отправить отклик</button>
+              </div>` : ""}
+              <div class="panel" id="bids-panel" hidden>
+                <h3>Отклики</h3>
+                <div id="bids-list" class="list"></div>
+              </div>
+            </div>
+          </div>`;
+
+        document.getElementById("publish")?.addEventListener("click", async (e) => {
+          HochuApp.setBusy(e.currentTarget, true);
+          try {
+            await HochuApi.post(`/api/projects/${id}/publish`);
+            HochuApp.toast("Проект опубликован");
+            await load();
+          } catch (err) {
+            HochuApp.toast(err.message, true);
+            HochuApp.setBusy(e.currentTarget, false);
+          }
+        });
+
+        document.getElementById("bid-submit")?.addEventListener("click", async () => {
+          const errEl = document.getElementById("bid-error");
+          const btn = document.getElementById("bid-submit");
+          errEl.hidden = true;
+          HochuApp.setBusy(btn, true);
+          try {
+            await HochuApi.post(`/api/projects/${id}/bids`, {
+              price: Number(document.getElementById("price").value),
+              estimatedDays: Number(document.getElementById("days").value),
+              coverLetter: document.getElementById("letter").value.trim()
+            });
+            HochuApp.toast("Отклик отправлен");
+            document.getElementById("bid-panel").innerHTML = `<p class="ok-text">Ваш отклик отправлен заказчику.</p>`;
+          } catch (err) {
+            errEl.textContent = err.message;
+            errEl.hidden = false;
+            HochuApp.setBusy(btn, false);
+          }
+        });
+
+        document.getElementById("show-bids")?.addEventListener("click", async () => {
+          const panel = document.getElementById("bids-panel");
+          const list = document.getElementById("bids-list");
+          panel.hidden = false;
+          list.innerHTML = `<div class="skeleton"></div>`;
+          try {
+            const bids = await HochuApi.get(`/api/projects/${id}/bids`);
+            if (!bids.length) {
+              list.innerHTML = `<div class="empty">Откликов пока нет.</div>`;
+              return;
+            }
+            list.innerHTML = bids.map(b => `
+              <div class="item">
+                <div class="item__title">${HochuApp.escapeHtml(b.sellerName || "Исполнитель")}</div>
+                <div class="item__meta">
+                  ${HochuApp.statusBadge(HochuApp.BID_STATUS, b.status)}
+                  <span>${HochuApp.money(b.price)}</span>
+                  <span>${b.estimatedDays} дн.</span>
+                </div>
+                <p class="muted" style="margin:0.4rem 0 0;white-space:pre-wrap">${HochuApp.escapeHtml(b.coverLetter)}</p>
+                ${(b.status === 0 || b.status === "Pending") ? `
+                  <div class="row" style="margin-top:0.6rem">
+                    <button class="btn btn-primary" data-accept="${b.id}" type="button">Принять</button>
+                  </div>` : ""}
+              </div>`).join("");
+
+            list.querySelectorAll("[data-accept]").forEach(btn => {
+              btn.addEventListener("click", async () => {
+                HochuApp.setBusy(btn, true);
+                try {
+                  const result = await HochuApi.post(`/api/bids/${btn.dataset.accept}/accept`);
+                  HochuApp.toast("Сделка создана");
+                  location.href = `/deal.html?id=${result.dealId}`;
+                } catch (err) {
+                  HochuApp.toast(err.message, true);
+                  HochuApp.setBusy(btn, false);
+                }
+              });
+            });
+          } catch (err) {
+            list.innerHTML = `<div class="empty">${HochuApp.escapeHtml(err.message)}</div>`;
+          }
+        });
+      } catch (err) {
+        root.innerHTML = `<div class="empty">${HochuApp.escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    (async () => {
+      await HochuApp.mountShell({ active: "projects" });
+      await load();
+    })();
+  </script>
+</body>
+</html>

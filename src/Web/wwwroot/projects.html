@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Проекты — Хочу Проект</title>
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+  <main class="main">
+    <div class="wrap">
+      <div class="page-head">
+        <div>
+          <h1>Проекты</h1>
+          <p>Открытые инженерные задачи на площадке.</p>
+        </div>
+        <a class="btn btn-primary" href="/create-project.html">Создать проект</a>
+      </div>
+      <div class="toolbar">
+        <input class="input" id="q" type="search" placeholder="Поиск по названию" />
+        <select class="select" id="category"></select>
+        <button class="btn btn-ghost" id="reload" type="button">Обновить</button>
+      </div>
+      <div class="list" id="list"><div class="skeleton"></div><div class="skeleton"></div></div>
+    </div>
+  </main>
+  <footer class="site-footer" id="site-footer"></footer>
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    async function loadCategories() {
+      const items = await HochuApi.get("/api/categories");
+      const select = document.getElementById("category");
+      select.innerHTML = `<option value="">Все категории</option>` +
+        items.map(c => `<option value="${c.id}">${HochuApp.escapeHtml(c.name)}</option>`).join("");
+    }
+
+    async function loadProjects() {
+      const list = document.getElementById("list");
+      list.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div>`;
+      const q = document.getElementById("q").value.trim();
+      const categoryId = document.getElementById("category").value;
+      const params = new URLSearchParams({ page: "1", pageSize: "30" });
+      if (q) params.set("q", q);
+      if (categoryId) params.set("categoryId", categoryId);
+      try {
+        const data = await HochuApi.get(`/api/projects?${params}`);
+        if (!data.items?.length) {
+          list.innerHTML = `<div class="empty">Пока нет опубликованных проектов.</div>`;
+          return;
+        }
+        list.innerHTML = data.items.map(p => `
+          <a class="item" href="/project.html?id=${p.id}">
+            <div class="item__title">${HochuApp.escapeHtml(p.title)}</div>
+            <div class="item__meta">
+              ${HochuApp.statusBadge(HochuApp.PROJECT_STATUS, p.status, true)}
+              <span>${HochuApp.money(p.budgetAmount, p.currency)}</span>
+              <span>до ${HochuApp.escapeHtml(p.deadline)}</span>
+              <span>${HochuApp.escapeHtml(p.category?.name || "")}</span>
+            </div>
+          </a>`).join("");
+      } catch (err) {
+        list.innerHTML = `<div class="empty">${HochuApp.escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    document.getElementById("reload").addEventListener("click", loadProjects);
+    document.getElementById("q").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") loadProjects();
+    });
+    document.getElementById("category").addEventListener("change", loadProjects);
+
+    (async () => {
+      await HochuApp.mountShell({ active: "projects" });
+      await loadCategories();
+      await loadProjects();
+    })();
+  </script>
+</body>
+</html>
