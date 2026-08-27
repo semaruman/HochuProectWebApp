@@ -11,7 +11,6 @@ using Web.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddRazorPages();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddProblemDetails();
@@ -39,11 +38,13 @@ builder.Services
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
+builder.Services.AddAuthorization();
+
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.LoginPath = "/Account/Login";
-    options.LogoutPath = "/Account/Logout";
-    options.AccessDeniedPath = "/Account/Login";
+    options.LoginPath = "/login.html";
+    options.LogoutPath = "/login.html";
+    options.AccessDeniedPath = "/login.html";
     options.SlidingExpiration = true;
     options.ExpireTimeSpan = TimeSpan.FromDays(14);
     options.Cookie.HttpOnly = true;
@@ -56,7 +57,8 @@ builder.Services.ConfigureApplicationCookie(options =>
             return Task.CompletedTask;
         }
 
-        context.Response.Redirect(context.RedirectUri);
+        var returnUrl = context.Request.Path + context.Request.QueryString;
+        context.Response.Redirect($"/login.html?returnUrl={Uri.EscapeDataString(returnUrl)}");
         return Task.CompletedTask;
     };
     options.Events.OnRedirectToAccessDenied = context =>
@@ -67,7 +69,7 @@ builder.Services.ConfigureApplicationCookie(options =>
             return Task.CompletedTask;
         }
 
-        context.Response.Redirect(context.RedirectUri);
+        context.Response.Redirect("/login.html");
         return Task.CompletedTask;
     };
 });
@@ -100,6 +102,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseRouting();
 app.Use(async (context, next) =>
@@ -113,7 +116,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
-app.MapRazorPages();
 app.MapFeatureEndpoints();
 
 using (var scope = app.Services.CreateScope())
