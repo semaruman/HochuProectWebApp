@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hochuproect
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: Host=db;Port=5432;Database=hochuproect;Username=postgres;Password=postgres
+      FileStorage__Root: /app/App_Data/files
+      Database__MigrateOnStartup: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - filesdata:/app/App_Data/files
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  filesdata:
