@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Web.Common.Auth;
 using Web.Common.Endpoints;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Common.Validation;
 using Web.Domain.Entities;
 using Web.Domain.Enums;
@@ -68,19 +68,38 @@ public class ProjectsEndpoints : IEndpoint
             AppDbContext db,
             CancellationToken ct) =>
         {
-            await validator.ValidateOrThrowAsync(request, ct);
-            await AccountGuards.RequireActiveUserAsync(userManager, currentUser.UserId, ct: ct);
-            if (!await db.Categories.AnyAsync(c => c.Id == request.CategoryId, ct))
-                throw AppErrors.BadRequest("Category not found.");
+            var validation = await validator.ValidateRequestAsync(request, ct);
+            if (validation.IsFailure)
+                return validation.ToHttpResult(() => Results.Ok());
 
-            var project = Project.Create(
-                currentUser.UserId,
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var activeUser = await AccountGuards.RequireActiveUserAsync(userManager, userId, ct: ct);
+            if (activeUser.IsFailure)
+                return activeUser.ToHttpResult(_ => Results.Ok());
+
+            if (!await db.Categories.AnyAsync(c => c.Id == request.CategoryId, ct))
+                return ResultErrors.BadRequest("Category not found.").ToProblemResult();
+
+            var budgetResult = Money.Rub(request.BudgetAmount);
+            if (budgetResult.IsFailure)
+                return budgetResult.ToHttpResult(_ => Results.Ok());
+
+            var projectResult = Project.Create(
+                userId,
                 request.CategoryId,
                 request.Title,
                 request.Description,
-                Money.Rub(request.BudgetAmount),
+                budgetResult.Value,
                 request.Deadline,
                 DateTime.UtcNow);
+            if (projectResult.IsFailure)
+                return projectResult.ToHttpResult(_ => Results.Ok());
+
+            var project = projectResult.Value;
             db.Projects.Add(project);
             await db.SaveChangesAsync(ct);
             return Results.Created($"/api/projects/{project.Id}", MapLite(project));
@@ -136,9 +155,14 @@ public class ProjectsEndpoints : IEndpoint
 
         group.MapGet("/mine", async (ICurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
         {
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
             var items = await db.Projects.AsNoTracking()
                 .Include(p => p.Category)
-                .Where(p => p.BuyerId == currentUser.UserId)
+                .Where(p => p.BuyerId == userId)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync(ct);
             return Results.Ok(items.Select(MapLite));
@@ -149,12 +173,13 @@ public class ProjectsEndpoints : IEndpoint
             var project = await db.Projects.AsNoTracking()
                 .Include(p => p.Category)
                 .Include(p => p.Attachments)
-                .FirstOrDefaultAsync(p => p.Id == id, ct)
-                ?? throw AppErrors.NotFound("Project not found.");
+                .FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (project is null)
+                return ResultErrors.NotFound("Project not found.").ToProblemResult();
 
             var userId = currentUser.TryGetUserId();
             if (project.Status == ProjectStatus.Draft && project.BuyerId != userId)
-                throw AppErrors.Forbidden();
+                return ResultErrors.Forbidden().ToProblemResult();
 
             return Results.Ok(new
             {
@@ -181,50 +206,87 @@ public class ProjectsEndpoints : IEndpoint
             AppDbContext db,
             CancellationToken ct) =>
         {
-            await validator.ValidateOrThrowAsync(request, ct);
-            var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct)
-                ?? throw AppErrors.NotFound();
-            if (!project.IsOwner(currentUser.UserId))
-                throw AppErrors.Forbidden();
+            var validation = await validator.ValidateRequestAsync(request, ct);
+            if (validation.IsFailure)
+                return validation.ToHttpResult(() => Results.Ok());
+
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (project is null)
+                return ResultErrors.NotFound().ToProblemResult();
+            if (!project.IsOwner(userId))
+                return ResultErrors.Forbidden().ToProblemResult();
 
             if (!await db.Categories.AnyAsync(c => c.Id == request.CategoryId, ct))
-                throw AppErrors.BadRequest("Category not found.");
+                return ResultErrors.BadRequest("Category not found.").ToProblemResult();
 
-            project.UpdateDetails(
+            var budgetResult = Money.Rub(request.BudgetAmount);
+            if (budgetResult.IsFailure)
+                return budgetResult.ToHttpResult(_ => Results.Ok());
+
+            var updateResult = project.UpdateDetails(
                 request.Title,
                 request.Description,
                 request.CategoryId,
-                Money.Rub(request.BudgetAmount),
+                budgetResult.Value,
                 request.Deadline,
                 DateTime.UtcNow);
+            if (updateResult.IsFailure)
+                return updateResult.ToHttpResult(() => Results.Ok());
+
             await db.SaveChangesAsync(ct);
             return Results.Ok(MapLite(project));
         }).RequireAuthorization();
 
         group.MapPost("/{id:guid}/publish", async (Guid id, ICurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
         {
-            var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct)
-                ?? throw AppErrors.NotFound();
-            if (!project.IsOwner(currentUser.UserId))
-                throw AppErrors.Forbidden();
-            project.Publish(DateTime.UtcNow);
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (project is null)
+                return ResultErrors.NotFound().ToProblemResult();
+            if (!project.IsOwner(userId))
+                return ResultErrors.Forbidden().ToProblemResult();
+
+            var publishResult = project.Publish(DateTime.UtcNow);
+            if (publishResult.IsFailure)
+                return publishResult.ToHttpResult(() => Results.Ok());
+
             await db.SaveChangesAsync(ct);
             return Results.Ok(MapLite(project));
         }).RequireAuthorization();
 
         group.MapPost("/{id:guid}/cancel", async (Guid id, ICurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
         {
-            var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct)
-                ?? throw AppErrors.NotFound();
-            if (!project.IsOwner(currentUser.UserId))
-                throw AppErrors.Forbidden();
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (project is null)
+                return ResultErrors.NotFound().ToProblemResult();
+            if (!project.IsOwner(userId))
+                return ResultErrors.Forbidden().ToProblemResult();
+
             if (project.Status == ProjectStatus.InProgress)
             {
                 var deal = await db.Deals.FirstOrDefaultAsync(d => d.ProjectId == id, ct);
                 if (deal is not null && deal.Status is not DealStatus.Cancelled)
-                    throw AppErrors.Business("Cancel the deal before cancelling an in-progress project.");
+                    return ResultErrors.Business("Cancel the deal before cancelling an in-progress project.").ToProblemResult();
             }
-            project.Cancel(DateTime.UtcNow);
+
+            var cancelResult = project.Cancel(DateTime.UtcNow);
+            if (cancelResult.IsFailure)
+                return cancelResult.ToHttpResult(() => Results.Ok());
+
             await db.SaveChangesAsync(ct);
             return Results.Ok(MapLite(project));
         }).RequireAuthorization();
@@ -237,21 +299,33 @@ public class ProjectsEndpoints : IEndpoint
             IFileStorage files,
             CancellationToken ct) =>
         {
-            var project = await db.Projects.Include(p => p.Attachments).FirstOrDefaultAsync(p => p.Id == id, ct)
-                ?? throw AppErrors.NotFound();
-            if (!project.IsOwner(currentUser.UserId))
-                throw AppErrors.Forbidden();
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var project = await db.Projects.Include(p => p.Attachments).FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (project is null)
+                return ResultErrors.NotFound().ToProblemResult();
+            if (!project.IsOwner(userId))
+                return ResultErrors.Forbidden().ToProblemResult();
             if (!project.CanAttachFiles())
-                throw AppErrors.Business("Cannot attach files to this project.");
+                return ResultErrors.Business("Cannot attach files to this project.").ToProblemResult();
             if (project.Attachments.Count >= 5)
-                throw AppErrors.Business("Maximum 5 attachments.");
+                return ResultErrors.Business("Maximum 5 attachments.").ToProblemResult();
             if (!request.HasFormContentType)
-                throw AppErrors.BadRequest("Multipart form expected.");
-            var file = request.Form.Files.FirstOrDefault()
-                ?? throw AppErrors.BadRequest("File required.");
+                return ResultErrors.BadRequest("Multipart form expected.").ToProblemResult();
+
+            var file = request.Form.Files.FirstOrDefault();
+            if (file is null)
+                return ResultErrors.BadRequest("File required.").ToProblemResult();
 
             await using var stream = file.OpenReadStream();
-            var stored = await files.SaveAsync(stream, file.FileName, file.ContentType, $"projects/{id}", ct);
+            var storedResult = await files.SaveAsync(stream, file.FileName, file.ContentType, $"projects/{id}", ct);
+            if (storedResult.IsFailure)
+                return storedResult.ToHttpResult(_ => Results.Ok());
+
+            var stored = storedResult.Value;
             var attachment = ProjectAttachment.Create(
                 id, stored.StorageKey, stored.FileName, stored.ContentType, stored.SizeBytes, DateTime.UtcNow);
             db.ProjectAttachments.Add(attachment);
@@ -267,12 +341,21 @@ public class ProjectsEndpoints : IEndpoint
             IFileStorage files,
             CancellationToken ct) =>
         {
-            var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct)
-                ?? throw AppErrors.NotFound();
-            if (!project.IsOwner(currentUser.UserId))
-                throw AppErrors.Forbidden();
-            var attachment = await db.ProjectAttachments.FirstOrDefaultAsync(a => a.Id == attachmentId && a.ProjectId == id, ct)
-                ?? throw AppErrors.NotFound();
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (project is null)
+                return ResultErrors.NotFound().ToProblemResult();
+            if (!project.IsOwner(userId))
+                return ResultErrors.Forbidden().ToProblemResult();
+
+            var attachment = await db.ProjectAttachments.FirstOrDefaultAsync(a => a.Id == attachmentId && a.ProjectId == id, ct);
+            if (attachment is null)
+                return ResultErrors.NotFound().ToProblemResult();
+
             await files.DeleteAsync(attachment.StorageKey, ct);
             db.ProjectAttachments.Remove(attachment);
             await db.SaveChangesAsync(ct);

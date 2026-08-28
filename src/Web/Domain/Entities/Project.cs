@@ -1,6 +1,6 @@
+using Web.Common.Results;
 using Web.Domain.Enums;
 using Web.Domain.Events;
-using Web.Domain.Exceptions;
 using Web.Domain.ValueObjects;
 
 namespace Web.Domain.Entities;
@@ -30,10 +30,10 @@ public class Project : Entity
     public ICollection<Bid> Bids { get; private set; } = new List<Bid>();
     public Deal? Deal { get; private set; }
 
-    public Money Budget => new(BudgetAmount, Currency);
+    public Money Budget => Money.FromTrusted(BudgetAmount, Currency);
     public bool IsOwner(Guid userId) => BuyerId == userId;
 
-    public static Project Create(
+    public static Result<Project> Create(
         Guid buyerId,
         Guid categoryId,
         string title,
@@ -43,13 +43,13 @@ public class Project : Entity
         DateTime utcNow)
     {
         if (buyerId == Guid.Empty)
-            throw new DomainException("Buyer is required.");
+            return ResultErrors.Business("Buyer is required.");
         if (categoryId == Guid.Empty)
-            throw new DomainException("Category is required.");
+            return ResultErrors.Business("Category is required.");
         if (string.IsNullOrWhiteSpace(title) || title.Trim().Length < 5)
-            throw new DomainException("Title is too short.");
+            return ResultErrors.Business("Title is too short.");
         if (string.IsNullOrWhiteSpace(description) || description.Trim().Length < 20)
-            throw new DomainException("Description is too short.");
+            return ResultErrors.Business("Description is too short.");
 
         return new Project
         {
@@ -67,16 +67,16 @@ public class Project : Entity
         };
     }
 
-    public void UpdateDetails(string title, string description, Guid categoryId, Money budget, DateOnly deadline, DateTime utcNow)
+    public Result UpdateDetails(string title, string description, Guid categoryId, Money budget, DateOnly deadline, DateTime utcNow)
     {
         if (Status is not (ProjectStatus.Draft or ProjectStatus.Published))
-            throw new DomainException("Project cannot be edited in its current status.");
+            return ResultErrors.Business("Project cannot be edited in its current status.");
         if (categoryId == Guid.Empty)
-            throw new DomainException("Category is required.");
+            return ResultErrors.Business("Category is required.");
         if (string.IsNullOrWhiteSpace(title) || title.Trim().Length < 5)
-            throw new DomainException("Title is too short.");
+            return ResultErrors.Business("Title is too short.");
         if (string.IsNullOrWhiteSpace(description) || description.Trim().Length < 20)
-            throw new DomainException("Description is too short.");
+            return ResultErrors.Business("Description is too short.");
 
         Title = title.Trim();
         Description = description.Trim();
@@ -85,71 +85,84 @@ public class Project : Entity
         Currency = budget.Currency;
         Deadline = deadline;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
-    public void Publish(DateTime utcNow)
+    public Result Publish(DateTime utcNow)
     {
         if (Status != ProjectStatus.Draft)
-            throw new DomainException("Only draft projects can be published.");
+            return ResultErrors.Business("Only draft projects can be published.");
         Status = ProjectStatus.Published;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
-    public void Cancel(DateTime utcNow)
+    public Result Cancel(DateTime utcNow)
     {
         if (Status is ProjectStatus.Completed or ProjectStatus.Cancelled)
-            throw new DomainException("Project cannot be cancelled in its current status.");
+            return ResultErrors.Business("Project cannot be cancelled in its current status.");
         Status = ProjectStatus.Cancelled;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
-    public void MarkInProgress(DateTime utcNow)
+    public Result MarkInProgress(DateTime utcNow)
     {
         if (Status != ProjectStatus.Published)
-            throw new DomainException("Only published projects can move to in progress.");
+            return ResultErrors.Business("Only published projects can move to in progress.");
         Status = ProjectStatus.InProgress;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
-    public void MarkCompleted(DateTime utcNow)
+    public Result MarkCompleted(DateTime utcNow)
     {
         if (Status != ProjectStatus.InProgress)
-            throw new DomainException("Only in-progress projects can be completed.");
+            return ResultErrors.Business("Only in-progress projects can be completed.");
         Status = ProjectStatus.Completed;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
-    public void Hide(DateTime utcNow)
+    public Result Hide(DateTime utcNow)
     {
         if (Status is ProjectStatus.Completed or ProjectStatus.Cancelled)
-            throw new DomainException("Project cannot be hidden in its current status.");
+            return ResultErrors.Business("Project cannot be hidden in its current status.");
         Status = ProjectStatus.Hidden;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
-    public void RestorePublication(DateTime utcNow)
+    public Result RestorePublication(DateTime utcNow)
     {
         if (Status != ProjectStatus.Hidden)
-            throw new DomainException("Only hidden projects can be restored.");
+            return ResultErrors.Business("Only hidden projects can be restored.");
         Status = ProjectStatus.Published;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
     public bool CanAttachFiles() => Status is not (ProjectStatus.Completed or ProjectStatus.Cancelled or ProjectStatus.Hidden);
 
-    public Deal RecordAcceptedBid(Bid bid, IReadOnlyCollection<Bid> otherPending, DateTime utcNow)
+    public Result<Deal> RecordAcceptedBid(Bid bid, IReadOnlyCollection<Bid> otherPending, DateTime utcNow)
     {
         if (bid.ProjectId != Id)
-            throw new DomainException("Bid does not belong to this project.");
+            return ResultErrors.Business("Bid does not belong to this project.");
         if (Status != ProjectStatus.InProgress)
-            throw new DomainException("Project is not ready to accept a bid.");
+            return ResultErrors.Business("Project is not ready to accept a bid.");
 
-        bid.Accept(utcNow);
+        var accept = bid.Accept(utcNow);
+        if (accept.IsFailure) return accept.Error;
         foreach (var other in otherPending)
-            other.Reject(utcNow);
+        {
+            var reject = other.Reject(utcNow);
+            if (reject.IsFailure) return reject.Error;
+        }
 
-        var deal = Deal.FromAcceptedBid(this, bid, utcNow);
-        Raise(new BidAccepted(Id, bid.Id, deal.Id, BuyerId, bid.SellerId, Title, utcNow));
-        return deal;
+        var dealResult = Deal.FromAcceptedBid(this, bid, utcNow);
+        if (dealResult.IsFailure) return dealResult.Error;
+
+        Raise(new BidAccepted(Id, bid.Id, dealResult.Value.Id, BuyerId, bid.SellerId, Title, utcNow));
+        return dealResult.Value;
     }
 }

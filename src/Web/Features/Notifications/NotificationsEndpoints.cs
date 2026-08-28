@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Web.Common.Auth;
 using Web.Common.Endpoints;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Infrastructure.Persistence;
 
 namespace Web.Features.Notifications;
@@ -14,7 +14,11 @@ public class NotificationsEndpoints : IEndpoint
 
         group.MapGet("/", async (ICurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
         {
-            var userId = currentUser.UserId;
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
             var items = await db.Notifications.AsNoTracking()
                 .Where(n => n.UserId == userId)
                 .OrderByDescending(n => n.CreatedAt)
@@ -35,9 +39,15 @@ public class NotificationsEndpoints : IEndpoint
 
         group.MapPost("/{id:guid}/read", async (Guid id, ICurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
         {
-            var userId = currentUser.UserId;
-            var item = await db.Notifications.FirstOrDefaultAsync(n => n.Id == id && n.UserId == userId, ct)
-                ?? throw AppErrors.NotFound();
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var item = await db.Notifications.FirstOrDefaultAsync(n => n.Id == id && n.UserId == userId, ct);
+            if (item is null)
+                return ResultErrors.NotFound().ToProblemResult();
+
             item.IsRead = true;
             await db.SaveChangesAsync(ct);
             return Results.Ok(new { item.Id, item.IsRead });
@@ -45,7 +55,11 @@ public class NotificationsEndpoints : IEndpoint
 
         group.MapPost("/read-all", async (ICurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
         {
-            var userId = currentUser.UserId;
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
             await db.Notifications
                 .Where(n => n.UserId == userId && !n.IsRead)
                 .ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true), ct);

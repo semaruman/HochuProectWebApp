@@ -1,19 +1,23 @@
 using System.Security.Claims;
+using Web.Common.Results;
 
 namespace Web.Common.Auth;
 
 public interface ICurrentUser
 {
     bool IsAuthenticated { get; }
-    Guid UserId { get; }
     Guid? TryGetUserId();
+}
+
+public static class CurrentUserExtensions
+{
+    public static Result<Guid> GetUserId(this ICurrentUser currentUser)
+        => currentUser.TryGetUserId() is Guid id ? id : ResultErrors.Unauthorized();
 }
 
 public sealed class HttpCurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
 {
     public bool IsAuthenticated => httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated == true;
-
-    public Guid UserId => TryGetUserId() ?? throw new UnauthorizedAccessException();
 
     public Guid? TryGetUserId()
     {

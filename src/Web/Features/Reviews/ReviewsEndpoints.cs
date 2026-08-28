@@ -2,7 +2,7 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Web.Common.Auth;
 using Web.Common.Endpoints;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Common.Validation;
 using Web.Infrastructure.Persistence;
 
@@ -31,9 +31,16 @@ public class ReviewsEndpoints : IEndpoint
             CreateReviewHandler handler,
             CancellationToken ct) =>
         {
-            await validator.ValidateOrThrowAsync(request, ct);
-            var review = await handler.HandleAsync(dealId, currentUser.UserId, request.Rating, request.Comment, ct);
-            return Results.Created($"/api/profiles/{review.RecipientId}/reviews", review);
+            var validation = await validator.ValidateRequestAsync(request, ct);
+            if (validation.IsFailure)
+                return validation.ToHttpResult(() => Results.Ok());
+
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+
+            var result = await handler.HandleAsync(dealId, userIdResult.Value, request.Rating, request.Comment, ct);
+            return result.ToHttpResult(review => Results.Created($"/api/profiles/{review.RecipientId}/reviews", review));
         }).RequireAuthorization().WithTags("Reviews");
 
         app.MapGet("/api/profiles/{userId:guid}/reviews", async (Guid userId, AppDbContext db, CancellationToken ct) =>

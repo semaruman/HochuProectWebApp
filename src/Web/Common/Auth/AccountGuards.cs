@@ -1,23 +1,24 @@
 using Microsoft.AspNetCore.Identity;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Domain.Entities;
 
 namespace Web.Common.Auth;
 
 public static class AccountGuards
 {
-    public static async Task<ApplicationUser> RequireActiveUserAsync(
+    public static async Task<Result<ApplicationUser>> RequireActiveUserAsync(
         UserManager<ApplicationUser> userManager,
         Guid userId,
         bool requireConfirmedEmail = true,
         CancellationToken ct = default)
     {
-        var user = await userManager.FindByIdAsync(userId.ToString())
-            ?? throw AppErrors.Unauthorized();
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return ResultErrors.Unauthorized();
         if (user.IsBlocked)
-            throw AppErrors.Forbidden("Account is blocked.");
+            return ResultErrors.Forbidden("Account is blocked.");
         if (requireConfirmedEmail && !user.EmailConfirmed)
-            throw AppErrors.Forbidden("Please confirm your email address.");
+            return ResultErrors.Forbidden("Please confirm your email address.");
         return user;
     }
 }

@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Domain.Entities;
 using Web.Domain.Enums;
 using Web.Domain.ValueObjects;
@@ -23,7 +23,7 @@ public sealed record AcceptBidResult(Guid DealId, Guid ProjectId, Guid BidId);
 
 public sealed class CreateBidHandler(AppDbContext db, IDomainEventDispatcher dispatcher)
 {
-    public async Task<BidDto> HandleAsync(
+    public async Task<Result<BidDto>> HandleAsync(
         Guid projectId,
         Guid sellerId,
         decimal price,
@@ -31,15 +31,22 @@ public sealed class CreateBidHandler(AppDbContext db, IDomainEventDispatcher dis
         string coverLetter,
         CancellationToken ct)
     {
-        var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, ct)
-            ?? throw AppErrors.NotFound("Project not found.");
+        var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == projectId, ct);
+        if (project is null)
+            return ResultErrors.NotFound("Project not found.");
 
         var exists = await db.Bids.AnyAsync(b =>
             b.ProjectId == projectId && b.SellerId == sellerId && b.Status == BidStatus.Pending, ct);
         if (exists)
-            throw AppErrors.Conflict("You already have a pending bid on this project.");
+            return ResultErrors.Conflict("You already have a pending bid on this project.");
 
-        var bid = Bid.Place(project, sellerId, Money.Rub(price), estimatedDays, coverLetter, DateTime.UtcNow);
+        var money = Money.Rub(price);
+        if (money.IsFailure) return money.Error;
+
+        var bidResult = Bid.Place(project, sellerId, money.Value, estimatedDays, coverLetter, DateTime.UtcNow);
+        if (bidResult.IsFailure) return bidResult.Error;
+
+        var bid = bidResult.Value;
         db.Bids.Add(bid);
         await db.SaveAndDispatchAsync(dispatcher, ct);
         return Map(bid);
@@ -52,14 +59,15 @@ public sealed class CreateBidHandler(AppDbContext db, IDomainEventDispatcher dis
 
 public sealed class AcceptBidHandler(AppDbContext db, IDomainEventDispatcher dispatcher)
 {
-    public async Task<AcceptBidResult> HandleAsync(Guid bidId, Guid buyerId, CancellationToken ct)
+    public async Task<Result<AcceptBidResult>> HandleAsync(Guid bidId, Guid buyerId, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-        var bid = await db.Bids.FirstOrDefaultAsync(b => b.Id == bidId, ct)
-            ?? throw AppErrors.NotFound("Bid not found.");
+        var bid = await db.Bids.FirstOrDefaultAsync(b => b.Id == bidId, ct);
+        if (bid is null)
+            return ResultErrors.NotFound("Bid not found.");
         if (!bid.IsPending)
-            throw AppErrors.Conflict("Bid is not pending.");
+            return ResultErrors.Conflict("Bid is not pending.");
 
         var utcNow = DateTime.UtcNow;
         var affected = await db.Database.ExecuteSqlInterpolatedAsync($@"
@@ -68,14 +76,17 @@ SET ""Status"" = {(int)ProjectStatus.InProgress}, ""UpdatedAt"" = {utcNow}, ""Ro
 WHERE ""Id"" = {bid.ProjectId} AND ""Status"" = {(int)ProjectStatus.Published} AND ""BuyerId"" = {buyerId}", ct);
 
         if (affected != 1)
-            throw AppErrors.Conflict("Project is not available for accepting a bid.");
+            return ResultErrors.Conflict("Project is not available for accepting a bid.");
 
         var project = await db.Projects.FirstAsync(p => p.Id == bid.ProjectId, ct);
         var otherPending = await db.Bids
             .Where(b => b.ProjectId == bid.ProjectId && b.Id != bid.Id && b.Status == BidStatus.Pending)
             .ToListAsync(ct);
 
-        var deal = project.RecordAcceptedBid(bid, otherPending, utcNow);
+        var dealResult = project.RecordAcceptedBid(bid, otherPending, utcNow);
+        if (dealResult.IsFailure) return dealResult.Error;
+
+        var deal = dealResult.Value;
         db.Deals.Add(deal);
 
         try
@@ -86,7 +97,7 @@ WHERE ""Id"" = {bid.ProjectId} AND ""Status"" = {(int)ProjectStatus.Published} A
         catch (DbUpdateException)
         {
             await tx.RollbackAsync(ct);
-            throw AppErrors.Conflict("Another bid was already accepted for this project.");
+            return ResultErrors.Conflict("Another bid was already accepted for this project.");
         }
 
         return new AcceptBidResult(deal.Id, project.Id, bid.Id);

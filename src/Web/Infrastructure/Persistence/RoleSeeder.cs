@@ -47,7 +47,11 @@ public static class RoleSeeder
                 return;
 
             if (!await db.Profiles.AnyAsync(p => p.UserId == admin.Id))
-                db.Profiles.Add(Profile.Create(admin.Id, "Admin", DateTime.UtcNow));
+            {
+                var profileResult = Profile.Create(admin.Id, "Admin", DateTime.UtcNow);
+                if (profileResult.IsSuccess)
+                    db.Profiles.Add(profileResult.Value);
+            }
             await db.SaveChangesAsync();
         }
 

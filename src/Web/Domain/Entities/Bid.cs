@@ -1,6 +1,6 @@
+using Web.Common.Results;
 using Web.Domain.Enums;
 using Web.Domain.Events;
-using Web.Domain.Exceptions;
 using Web.Domain.ValueObjects;
 
 namespace Web.Domain.Entities;
@@ -25,10 +25,10 @@ public class Bid : Entity
     public ApplicationUser Seller { get; private set; } = null!;
     public Deal? Deal { get; private set; }
 
-    public Money Offer => new(Price, "RUB");
+    public Money Offer => Money.FromTrusted(Price, "RUB");
     public bool IsPending => Status == BidStatus.Pending;
 
-    public static Bid Place(
+    public static Result<Bid> Place(
         Project project,
         Guid sellerId,
         Money price,
@@ -37,13 +37,13 @@ public class Bid : Entity
         DateTime utcNow)
     {
         if (project.Status != ProjectStatus.Published)
-            throw new DomainException("Bids are only accepted on published projects.");
+            return ResultErrors.Business("Bids are only accepted on published projects.");
         if (project.BuyerId == sellerId)
-            throw new DomainException("You cannot bid on your own project.");
+            return ResultErrors.Business("You cannot bid on your own project.");
         if (estimatedDays is <= 0 or > 3650)
-            throw new DomainException("Estimated days are out of range.");
+            return ResultErrors.Business("Estimated days are out of range.");
         if (string.IsNullOrWhiteSpace(coverLetter) || coverLetter.Trim().Length < 20)
-            throw new DomainException("Cover letter is too short.");
+            return ResultErrors.Business("Cover letter is too short.");
 
         var bid = new Bid
         {
@@ -61,42 +61,46 @@ public class Bid : Entity
         return bid;
     }
 
-    public void UpdateOffer(Money price, int estimatedDays, string coverLetter, DateTime utcNow)
+    public Result UpdateOffer(Money price, int estimatedDays, string coverLetter, DateTime utcNow)
     {
         if (Status != BidStatus.Pending)
-            throw new DomainException("Only pending bids can be edited.");
+            return ResultErrors.Business("Only pending bids can be edited.");
         if (estimatedDays is <= 0 or > 3650)
-            throw new DomainException("Estimated days are out of range.");
+            return ResultErrors.Business("Estimated days are out of range.");
         if (string.IsNullOrWhiteSpace(coverLetter) || coverLetter.Trim().Length < 20)
-            throw new DomainException("Cover letter is too short.");
+            return ResultErrors.Business("Cover letter is too short.");
 
         Price = price.Amount;
         EstimatedDays = estimatedDays;
         CoverLetter = coverLetter.Trim();
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
-    public void Withdraw(DateTime utcNow)
+    public Result Withdraw(DateTime utcNow)
     {
         if (Status != BidStatus.Pending)
-            throw new DomainException("Only pending bids can be withdrawn.");
+            return ResultErrors.Business("Only pending bids can be withdrawn.");
         Status = BidStatus.Withdrawn;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
-    internal void Accept(DateTime utcNow)
+    internal Result Accept(DateTime utcNow)
     {
         if (Status != BidStatus.Pending)
-            throw new DomainException("Only pending bids can be accepted.");
+            return ResultErrors.Business("Only pending bids can be accepted.");
         Status = BidStatus.Accepted;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
-    internal void Reject(DateTime utcNow)
+    internal Result Reject(DateTime utcNow)
     {
         if (Status != BidStatus.Pending)
-            throw new DomainException("Only pending bids can be rejected.");
+            return ResultErrors.Business("Only pending bids can be rejected.");
         Status = BidStatus.Rejected;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 }

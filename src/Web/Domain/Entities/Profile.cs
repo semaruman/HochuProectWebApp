@@ -1,4 +1,4 @@
-using Web.Domain.Exceptions;
+using Web.Common.Results;
 
 namespace Web.Domain.Entities;
 
@@ -21,12 +21,12 @@ public class Profile
     public ICollection<UserSkill> UserSkills { get; private set; } = new List<UserSkill>();
     public ICollection<PortfolioItem> PortfolioItems { get; private set; } = new List<PortfolioItem>();
 
-    public static Profile Create(Guid userId, string displayName, DateTime utcNow, string? bio = null)
+    public static Result<Profile> Create(Guid userId, string displayName, DateTime utcNow, string? bio = null)
     {
         if (userId == Guid.Empty)
-            throw new DomainException("User is required.");
+            return ResultErrors.Business("User is required.");
         if (string.IsNullOrWhiteSpace(displayName) || displayName.Trim().Length < 2)
-            throw new DomainException("Display name is too short.");
+            return ResultErrors.Business("Display name is too short.");
 
         return new Profile
         {
@@ -38,13 +38,14 @@ public class Profile
         };
     }
 
-    public void Update(string displayName, string? bio, DateTime utcNow)
+    public Result Update(string displayName, string? bio, DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(displayName) || displayName.Trim().Length < 2)
-            throw new DomainException("Display name is too short.");
+            return ResultErrors.Business("Display name is too short.");
         DisplayName = displayName.Trim();
         Bio = string.IsNullOrWhiteSpace(bio) ? null : bio.Trim();
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
     public void SetAvatar(string storageKey, DateTime utcNow)

@@ -1,8 +1,8 @@
 using FluentAssertions;
+using Web.Common.Results;
 using Web.Domain.Entities;
 using Web.Domain.Enums;
 using Web.Domain.Events;
-using Web.Domain.Exceptions;
 using Web.Domain.ValueObjects;
 using Web.Features.Bids;
 using Web.Features.Auth;
@@ -15,16 +15,18 @@ public class MoneyTests
     [Fact]
     public void Rub_RejectsNonPositiveAmount()
     {
-        var act = () => Money.Rub(0);
-        act.Should().Throw<DomainException>();
+        var result = Money.Rub(0);
+        result.IsFailure.Should().BeTrue();
+        result.Error.Kind.Should().Be(ErrorKind.Business);
     }
 
     [Fact]
     public void Constructor_NormalizesCurrency()
     {
-        var money = new Money(10.555m, "rub");
-        money.Currency.Should().Be("RUB");
-        money.Amount.Should().Be(10.56m);
+        var result = Money.TryCreate(10.555m, "rub");
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Currency.Should().Be("RUB");
+        result.Value.Amount.Should().Be(10.56m);
     }
 }
 
@@ -32,30 +34,33 @@ public class DomainStateMachineTests
 {
     private static readonly DateTime Now = new(2026, 8, 19, 12, 0, 0, DateTimeKind.Utc);
 
-    private static Project DraftProject() => Project.Create(
-        Guid.NewGuid(),
-        Guid.NewGuid(),
-        "3D-модель корпуса",
-        "Нужна параметрическая 3D-модель корпуса по чертежам заказчика.",
-        Money.Rub(10_000),
-        DateOnly.FromDateTime(Now.AddDays(14)),
-        Now);
+    private static Project DraftProject()
+    {
+        var budget = Money.Rub(10_000).Value;
+        return Project.Create(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "3D-модель корпуса",
+            "Нужна параметрическая 3D-модель корпуса по чертежам заказчика.",
+            budget,
+            DateOnly.FromDateTime(Now.AddDays(14)),
+            Now).Value;
+    }
 
     [Fact]
     public void Project_Publish_FromDraft_Succeeds()
     {
         var project = DraftProject();
-        project.Publish(Now);
+        project.Publish(Now).IsSuccess.Should().BeTrue();
         project.Status.Should().Be(ProjectStatus.Published);
     }
 
     [Fact]
-    public void Project_Publish_FromPublished_Throws()
+    public void Project_Publish_FromPublished_Fails()
     {
         var project = DraftProject();
-        project.Publish(Now);
-        var act = () => project.Publish(Now);
-        act.Should().Throw<DomainException>();
+        project.Publish(Now).IsSuccess.Should().BeTrue();
+        project.Publish(Now).IsFailure.Should().BeTrue();
     }
 
     [Fact]
@@ -63,11 +68,10 @@ public class DomainStateMachineTests
     {
         var project = DraftProject();
         project.Publish(Now);
-        var bid = Bid.Place(project, Guid.NewGuid(), Money.Rub(9_000), 5,
-            "Сделаю модель в SolidWorks с чертежами и STEP файлом.", Now);
-        bid.Accept(Now);
-        var act = () => bid.Withdraw(Now);
-        act.Should().Throw<DomainException>();
+        var bid = Bid.Place(project, Guid.NewGuid(), Money.Rub(9_000).Value, 5,
+            "Сделаю модель в SolidWorks с чертежами и STEP файлом.", Now).Value;
+        bid.Accept(Now).IsSuccess.Should().BeTrue();
+        bid.Withdraw(Now).IsFailure.Should().BeTrue();
     }
 
     [Fact]
@@ -76,13 +80,15 @@ public class DomainStateMachineTests
         var project = DraftProject();
         project.Publish(Now);
         var sellerId = Guid.NewGuid();
-        var bid = Bid.Place(project, sellerId, Money.Rub(9_000), 5,
-            "Сделаю модель в SolidWorks с чертежами и STEP файлом.", Now);
-        var other = Bid.Place(project, Guid.NewGuid(), Money.Rub(8_500), 6,
-            "Выполню модель быстрее и приложу пояснительную записку.", Now);
-        project.MarkInProgress(Now);
+        var bid = Bid.Place(project, sellerId, Money.Rub(9_000).Value, 5,
+            "Сделаю модель в SolidWorks с чертежами и STEP файлом.", Now).Value;
+        var other = Bid.Place(project, Guid.NewGuid(), Money.Rub(8_500).Value, 6,
+            "Выполню модель быстрее и приложу пояснительную записку.", Now).Value;
+        project.MarkInProgress(Now).IsSuccess.Should().BeTrue();
 
-        var deal = project.RecordAcceptedBid(bid, [other], Now);
+        var dealResult = project.RecordAcceptedBid(bid, [other], Now);
+        dealResult.IsSuccess.Should().BeTrue();
+        var deal = dealResult.Value;
 
         bid.Status.Should().Be(BidStatus.Accepted);
         other.Status.Should().Be(BidStatus.Rejected);
@@ -98,26 +104,27 @@ public class DomainStateMachineTests
     {
         var project = DraftProject();
         project.Publish(Now);
-        var bid = Bid.Place(project, Guid.NewGuid(), Money.Rub(9_000), 5,
-            "Сделаю модель в SolidWorks с чертежами и STEP файлом.", Now);
+        var bid = Bid.Place(project, Guid.NewGuid(), Money.Rub(9_000).Value, 5,
+            "Сделаю модель в SolidWorks с чертежами и STEP файлом.", Now).Value;
         project.MarkInProgress(Now);
-        var deal = project.RecordAcceptedBid(bid, [], Now);
+        var deal = project.RecordAcceptedBid(bid, [], Now).Value;
 
         deal.Status.Should().Be(DealStatus.InProgress);
         deal.FundedAt.Should().NotBeNull();
 
         var deliverable = deal.SubmitWork("Готово", Now.AddHours(1));
+        deliverable.IsSuccess.Should().BeTrue();
         deal.Status.Should().Be(DealStatus.Submitted);
-        deliverable.DealId.Should().Be(deal.Id);
+        deliverable.Value.DealId.Should().Be(deal.Id);
         deal.DomainEvents.OfType<WorkSubmitted>().Should().ContainSingle();
 
-        deal.RequestRevision("Нужно поправить чертёж по допускам", Now.AddHours(2));
+        deal.RequestRevision("Нужно поправить чертёж по допускам", Now.AddHours(2)).IsSuccess.Should().BeTrue();
         deal.Status.Should().Be(DealStatus.RevisionRequired);
 
-        deal.SubmitWork("Исправлено", Now.AddHours(3));
+        deal.SubmitWork("Исправлено", Now.AddHours(3)).IsSuccess.Should().BeTrue();
         deal.Status.Should().Be(DealStatus.Submitted);
 
-        deal.Accept(Now.AddHours(4));
+        deal.Accept(Now.AddHours(4)).IsSuccess.Should().BeTrue();
         deal.Status.Should().Be(DealStatus.Completed);
         deal.DomainEvents.OfType<DealCompleted>().Should().ContainSingle();
     }
@@ -130,21 +137,20 @@ public class DomainStateMachineTests
             Guid.NewGuid(),
             "Расчёт прочности детали",
             "Статический FEM-расчёт детали с отчётом и рекомендациями по геометрии.",
-            Money.Rub(15_000),
+            Money.Rub(15_000).Value,
             5,
-            Now);
-        service.Publish(Now);
+            Now).Value;
+        service.Publish(Now).IsSuccess.Should().BeTrue();
         service.Status.Should().Be(ServiceStatus.Published);
-        service.Archive(Now);
+        service.Archive(Now).IsSuccess.Should().BeTrue();
         service.Status.Should().Be(ServiceStatus.Archived);
-        var act = () => service.Publish(Now);
-        act.Should().Throw<DomainException>();
+        service.Publish(Now).IsFailure.Should().BeTrue();
     }
 
     [Fact]
     public void Profile_RecalculateRating()
     {
-        var profile = Profile.Create(Guid.NewGuid(), "Инженер", Now);
+        var profile = Profile.Create(Guid.NewGuid(), "Инженер", Now).Value;
         profile.RecalculateRating([5, 4, 4]);
         profile.ReviewCount.Should().Be(3);
         profile.AverageRating.Should().Be(4.33m);

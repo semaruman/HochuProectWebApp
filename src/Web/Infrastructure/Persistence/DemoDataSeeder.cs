@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Web.Common.Results;
 using Web.Domain.Entities;
 using Web.Domain.ValueObjects;
 
@@ -22,34 +23,51 @@ public static class DemoDataSeeder
         var calc = await db.Categories.FirstAsync(c => c.Slug == "engineering-calculations");
         var utcNow = DateTime.UtcNow;
 
-        var project = Project.Create(
+        var budget = Money.Rub(45000);
+        if (budget.IsFailure) return;
+
+        var projectResult = Project.Create(
             buyer.Id,
             category.Id,
             "3D-модель корпуса промышленного оборудования",
             "Нужно разработать параметрическую 3D-модель корпуса по чертежам. Форматы: STEP, SolidWorks. Учесть посадочные места и допуски.",
-            Money.Rub(45000),
+            budget.Value,
             DateOnly.FromDateTime(utcNow.AddDays(21)),
             utcNow);
-        project.Publish(utcNow);
+        if (projectResult.IsFailure) return;
+
+        var project = projectResult.Value;
+        if (project.Publish(utcNow).IsFailure) return;
         db.Projects.Add(project);
 
-        db.Bids.Add(Bid.Place(
+        var bidPrice = Money.Rub(42000);
+        if (bidPrice.IsFailure) return;
+
+        var bidResult = Bid.Place(
             project,
             seller.Id,
-            Money.Rub(42000),
+            bidPrice.Value,
             12,
             "Сделаю модель в SolidWorks, передам STEP/SLDPRT и краткий отчёт по допускам.",
-            utcNow));
+            utcNow);
+        if (bidResult.IsFailure) return;
+        db.Bids.Add(bidResult.Value);
 
-        var service = Service.Create(
+        var servicePrice = Money.Rub(15000);
+        if (servicePrice.IsFailure) return;
+
+        var serviceResult = Service.Create(
             seller.Id,
             calc.Id,
             "Прочностной расчёт детали (FEM)",
             "Статический расчёт детали/узла в ANSYS или аналоге. Результат: отчёт PDF + рекомендации по изменению геометрии.",
-            Money.Rub(15000),
+            servicePrice.Value,
             5,
             utcNow);
-        service.Publish(utcNow);
+        if (serviceResult.IsFailure) return;
+
+        var service = serviceResult.Value;
+        if (service.Publish(utcNow).IsFailure) return;
         db.Services.Add(service);
 
         await db.SaveChangesAsync();
@@ -75,9 +93,12 @@ public static class DemoDataSeeder
         };
         var result = await userManager.CreateAsync(user, password);
         if (!result.Succeeded)
-            throw new InvalidOperationException(string.Join("; ", result.Errors.Select(e => e.Description)));
+            return user;
 
-        db.Profiles.Add(Profile.Create(user.Id, displayName, DateTime.UtcNow, "Демо-аккаунт для локальной разработки."));
+        var profileResult = Profile.Create(user.Id, displayName, DateTime.UtcNow, "Демо-аккаунт для локальной разработки.");
+        if (profileResult.IsSuccess)
+            db.Profiles.Add(profileResult.Value);
+
         await db.SaveChangesAsync();
         return user;
     }

@@ -2,7 +2,7 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Web.Common.Auth;
 using Web.Common.Endpoints;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Common.Validation;
 using Web.Domain.Entities;
 using Web.Domain.Enums;
@@ -74,11 +74,13 @@ public class ServicesEndpoints : IEndpoint
         {
             var service = await db.Services.AsNoTracking()
                 .Include(s => s.Category)
-                .FirstOrDefaultAsync(s => s.Id == id, ct)
-                ?? throw AppErrors.NotFound();
+                .FirstOrDefaultAsync(s => s.Id == id, ct);
+            if (service is null)
+                return ResultErrors.NotFound().ToProblemResult();
+
             var userId = currentUser.TryGetUserId();
             if (service.Status != ServiceStatus.Published && service.SellerId != userId)
-                throw AppErrors.NotFound();
+                return ResultErrors.NotFound().ToProblemResult();
 
             return Results.Ok(new
             {
@@ -100,18 +102,34 @@ public class ServicesEndpoints : IEndpoint
             AppDbContext db,
             CancellationToken ct) =>
         {
-            await validator.ValidateOrThrowAsync(request, ct);
-            if (!await db.Categories.AnyAsync(c => c.Id == request.CategoryId, ct))
-                throw AppErrors.BadRequest("Category not found.");
+            var validation = await validator.ValidateRequestAsync(request, ct);
+            if (validation.IsFailure)
+                return validation.ToHttpResult(() => Results.Ok());
 
-            var service = Service.Create(
-                currentUser.UserId,
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            if (!await db.Categories.AnyAsync(c => c.Id == request.CategoryId, ct))
+                return ResultErrors.BadRequest("Category not found.").ToProblemResult();
+
+            var priceResult = Money.Rub(request.Price);
+            if (priceResult.IsFailure)
+                return priceResult.ToHttpResult(_ => Results.Ok());
+
+            var serviceResult = Service.Create(
+                userId,
                 request.CategoryId,
                 request.Title,
                 request.Description,
-                Money.Rub(request.Price),
+                priceResult.Value,
                 request.DeliveryDays,
                 DateTime.UtcNow);
+            if (serviceResult.IsFailure)
+                return serviceResult.ToHttpResult(_ => Results.Ok());
+
+            var service = serviceResult.Value;
             db.Services.Add(service);
             await db.SaveChangesAsync(ct);
             return Results.Created($"/api/services/{service.Id}", service);
@@ -125,41 +143,77 @@ public class ServicesEndpoints : IEndpoint
             AppDbContext db,
             CancellationToken ct) =>
         {
-            await validator.ValidateOrThrowAsync(request, ct);
-            var service = await db.Services.FirstOrDefaultAsync(s => s.Id == id, ct)
-                ?? throw AppErrors.NotFound();
-            if (service.SellerId != currentUser.UserId)
-                throw AppErrors.Forbidden();
+            var validation = await validator.ValidateRequestAsync(request, ct);
+            if (validation.IsFailure)
+                return validation.ToHttpResult(() => Results.Ok());
 
-            service.Update(
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var service = await db.Services.FirstOrDefaultAsync(s => s.Id == id, ct);
+            if (service is null)
+                return ResultErrors.NotFound().ToProblemResult();
+            if (service.SellerId != userId)
+                return ResultErrors.Forbidden().ToProblemResult();
+
+            var priceResult = Money.Rub(request.Price);
+            if (priceResult.IsFailure)
+                return priceResult.ToHttpResult(_ => Results.Ok());
+
+            var updateResult = service.Update(
                 request.Title,
                 request.Description,
                 request.CategoryId,
-                Money.Rub(request.Price),
+                priceResult.Value,
                 request.DeliveryDays,
                 DateTime.UtcNow);
+            if (updateResult.IsFailure)
+                return updateResult.ToHttpResult(() => Results.Ok());
+
             await db.SaveChangesAsync(ct);
             return Results.Ok(service);
         }).RequireAuthorization();
 
         group.MapPost("/{id:guid}/publish", async (Guid id, ICurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
         {
-            var service = await db.Services.FirstOrDefaultAsync(s => s.Id == id, ct)
-                ?? throw AppErrors.NotFound();
-            if (service.SellerId != currentUser.UserId)
-                throw AppErrors.Forbidden();
-            service.Publish(DateTime.UtcNow);
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var service = await db.Services.FirstOrDefaultAsync(s => s.Id == id, ct);
+            if (service is null)
+                return ResultErrors.NotFound().ToProblemResult();
+            if (service.SellerId != userId)
+                return ResultErrors.Forbidden().ToProblemResult();
+
+            var publishResult = service.Publish(DateTime.UtcNow);
+            if (publishResult.IsFailure)
+                return publishResult.ToHttpResult(() => Results.Ok());
+
             await db.SaveChangesAsync(ct);
             return Results.Ok(service);
         }).RequireAuthorization();
 
         group.MapPost("/{id:guid}/archive", async (Guid id, ICurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
         {
-            var service = await db.Services.FirstOrDefaultAsync(s => s.Id == id, ct)
-                ?? throw AppErrors.NotFound();
-            if (service.SellerId != currentUser.UserId)
-                throw AppErrors.Forbidden();
-            service.Archive(DateTime.UtcNow);
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var service = await db.Services.FirstOrDefaultAsync(s => s.Id == id, ct);
+            if (service is null)
+                return ResultErrors.NotFound().ToProblemResult();
+            if (service.SellerId != userId)
+                return ResultErrors.Forbidden().ToProblemResult();
+
+            var archiveResult = service.Archive(DateTime.UtcNow);
+            if (archiveResult.IsFailure)
+                return archiveResult.ToHttpResult(() => Results.Ok());
+
             await db.SaveChangesAsync(ct);
             return Results.Ok(service);
         }).RequireAuthorization();

@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Domain.Entities;
 using Web.Domain.Enums;
 using Web.Infrastructure.DomainEvents;
@@ -22,12 +22,13 @@ public sealed class FundDealHandler(
     IOptions<PaymentOptions> paymentOptions,
     IDomainEventDispatcher dispatcher)
 {
-    public async Task<DealActionResult> HandleAsync(Guid dealId, Guid buyerId, CancellationToken ct)
+    public async Task<Result<DealActionResult>> HandleAsync(Guid dealId, Guid buyerId, CancellationToken ct)
     {
-        var deal = await db.Deals.FirstOrDefaultAsync(d => d.Id == dealId, ct)
-            ?? throw AppErrors.NotFound();
+        var deal = await db.Deals.FirstOrDefaultAsync(d => d.Id == dealId, ct);
+        if (deal is null)
+            return ResultErrors.NotFound();
         if (deal.BuyerId != buyerId)
-            throw AppErrors.Forbidden();
+            return ResultErrors.Forbidden();
         if (deal.IsWorkStarted)
             return new DealActionResult(deal.Id, deal.Status, deal.FundedAt, deal.CompletedAt, Idempotent: true);
 
@@ -35,15 +36,19 @@ public sealed class FundDealHandler(
         var utcNow = DateTime.UtcNow;
         var paymentResult = await payments.CreateAndAuthorizeAsync(deal.Id, deal.Amount, ct);
         if (!paymentResult.Success)
-            throw AppErrors.Business(paymentResult.Error ?? "Payment failed.");
+            return ResultErrors.Business(paymentResult.Error ?? "Payment failed.");
 
-        deal.Fund(utcNow);
-        db.Payments.Add(Payment.Authorize(
+        var fund = deal.Fund(utcNow);
+        if (fund.IsFailure) return fund.Error;
+
+        var payment = Payment.Authorize(
             deal.Id,
             deal.Amount,
             paymentOptions.Value.Provider,
             paymentResult.ProviderPaymentId,
-            utcNow));
+            utcNow);
+        if (payment.IsFailure) return payment.Error;
+        db.Payments.Add(payment.Value);
 
         await db.SaveAndDispatchAsync(dispatcher, ct);
         await tx.CommitAsync(ct);
@@ -53,20 +58,24 @@ public sealed class FundDealHandler(
 
 public sealed class SubmitWorkHandler(AppDbContext db, IFileStorage files, IDomainEventDispatcher dispatcher)
 {
-    public async Task<SubmitWorkResult> HandleAsync(
+    public async Task<Result<SubmitWorkResult>> HandleAsync(
         Guid dealId,
         Guid sellerId,
         string? message,
         IReadOnlyList<DeliverableUpload>? uploads,
         CancellationToken ct)
     {
-        var deal = await db.Deals.FirstOrDefaultAsync(d => d.Id == dealId, ct)
-            ?? throw AppErrors.NotFound();
+        var deal = await db.Deals.FirstOrDefaultAsync(d => d.Id == dealId, ct);
+        if (deal is null)
+            return ResultErrors.NotFound();
         if (deal.SellerId != sellerId)
-            throw AppErrors.Forbidden();
+            return ResultErrors.Forbidden();
 
         var utcNow = DateTime.UtcNow;
-        var deliverable = deal.SubmitWork(message, utcNow);
+        var submit = deal.SubmitWork(message, utcNow);
+        if (submit.IsFailure) return submit.Error;
+
+        var deliverable = submit.Value;
         db.DealDeliverables.Add(deliverable);
 
         if (uploads is not null)
@@ -75,7 +84,8 @@ public sealed class SubmitWorkHandler(AppDbContext db, IFileStorage files, IDoma
             {
                 var stored = await files.SaveAsync(
                     upload.Content, upload.FileName, upload.ContentType, $"deals/{deal.Id}/deliverables", ct);
-                deliverable.AddFile(stored.StorageKey, stored.FileName, stored.ContentType, stored.SizeBytes);
+                if (stored.IsFailure) return stored.Error;
+                deliverable.AddFile(stored.Value.StorageKey, stored.Value.FileName, stored.Value.ContentType, stored.Value.SizeBytes);
             }
         }
 
@@ -86,28 +96,33 @@ public sealed class SubmitWorkHandler(AppDbContext db, IFileStorage files, IDoma
 
 public sealed class AcceptWorkHandler(AppDbContext db, IPaymentService payments, IDomainEventDispatcher dispatcher)
 {
-    public async Task<DealActionResult> HandleAsync(Guid dealId, Guid buyerId, CancellationToken ct)
+    public async Task<Result<DealActionResult>> HandleAsync(Guid dealId, Guid buyerId, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-        var deal = await db.Deals.Include(d => d.Payment).FirstOrDefaultAsync(d => d.Id == dealId, ct)
-            ?? throw AppErrors.NotFound();
+        var deal = await db.Deals.Include(d => d.Payment).FirstOrDefaultAsync(d => d.Id == dealId, ct);
+        if (deal is null)
+            return ResultErrors.NotFound();
         if (deal.BuyerId != buyerId)
-            throw AppErrors.Forbidden();
+            return ResultErrors.Forbidden();
         if (deal.IsCompleted)
             return new DealActionResult(deal.Id, deal.Status, deal.FundedAt, deal.CompletedAt, Idempotent: true);
 
         var utcNow = DateTime.UtcNow;
-        deal.Accept(utcNow);
+        var accept = deal.Accept(utcNow);
+        if (accept.IsFailure) return accept.Error;
+
         var project = await db.Projects.FirstAsync(p => p.Id == deal.ProjectId, ct);
-        project.MarkCompleted(utcNow);
+        var complete = project.MarkCompleted(utcNow);
+        if (complete.IsFailure) return complete.Error;
 
         if (deal.Payment is not null)
         {
             var capture = await payments.CaptureAsync(deal.Payment.ProviderPaymentId, ct);
             if (!capture.Success)
-                throw AppErrors.Business(capture.Error ?? "Capture failed.");
-            deal.Payment.MarkCaptured(utcNow);
+                return ResultErrors.Business(capture.Error ?? "Capture failed.");
+            var captured = deal.Payment.MarkCaptured(utcNow);
+            if (captured.IsFailure) return captured.Error;
         }
 
         await db.SaveAndDispatchAsync(dispatcher, ct);
@@ -118,28 +133,36 @@ public sealed class AcceptWorkHandler(AppDbContext db, IPaymentService payments,
 
 public sealed class CancelDealHandler(AppDbContext db, IPaymentService payments, IDomainEventDispatcher dispatcher)
 {
-    public async Task<DealActionResult> HandleAsync(Guid dealId, Guid actorId, CancellationToken ct)
+    public async Task<Result<DealActionResult>> HandleAsync(Guid dealId, Guid actorId, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-        var deal = await db.Deals.Include(d => d.Payment).FirstOrDefaultAsync(d => d.Id == dealId, ct)
-            ?? throw AppErrors.NotFound();
+        var deal = await db.Deals.Include(d => d.Payment).FirstOrDefaultAsync(d => d.Id == dealId, ct);
+        if (deal is null)
+            return ResultErrors.NotFound();
         if (!deal.IsParticipant(actorId))
-            throw AppErrors.Forbidden();
+            return ResultErrors.Forbidden();
 
         var utcNow = DateTime.UtcNow;
-        deal.Cancel(actorId, utcNow);
+        var cancel = deal.Cancel(actorId, utcNow);
+        if (cancel.IsFailure) return cancel.Error;
 
         if (deal.Payment is { Status: PaymentStatus.Authorized })
         {
             var refund = await payments.RefundAsync(deal.Payment.ProviderPaymentId, ct);
             if (refund.Success)
-                deal.Payment.MarkRefunded(utcNow);
+            {
+                var refunded = deal.Payment.MarkRefunded(utcNow);
+                if (refunded.IsFailure) return refunded.Error;
+            }
         }
 
         var project = await db.Projects.FirstAsync(p => p.Id == deal.ProjectId, ct);
         if (project.Status == ProjectStatus.InProgress)
-            project.Cancel(utcNow);
+        {
+            var projectCancel = project.Cancel(utcNow);
+            if (projectCancel.IsFailure) return projectCancel.Error;
+        }
 
         await db.SaveAndDispatchAsync(dispatcher, ct);
         await tx.CommitAsync(ct);
@@ -151,14 +174,17 @@ public sealed record RequestRevisionResult(Guid Id, DealStatus Status, string Co
 
 public sealed class RequestRevisionHandler(AppDbContext db, IDomainEventDispatcher dispatcher)
 {
-    public async Task<RequestRevisionResult> HandleAsync(Guid dealId, Guid buyerId, string comment, CancellationToken ct)
+    public async Task<Result<RequestRevisionResult>> HandleAsync(Guid dealId, Guid buyerId, string comment, CancellationToken ct)
     {
-        var deal = await db.Deals.FirstOrDefaultAsync(d => d.Id == dealId, ct)
-            ?? throw AppErrors.NotFound();
+        var deal = await db.Deals.FirstOrDefaultAsync(d => d.Id == dealId, ct);
+        if (deal is null)
+            return ResultErrors.NotFound();
         if (deal.BuyerId != buyerId)
-            throw AppErrors.Forbidden();
+            return ResultErrors.Forbidden();
 
-        deal.RequestRevision(comment, DateTime.UtcNow);
+        var revision = deal.RequestRevision(comment, DateTime.UtcNow);
+        if (revision.IsFailure) return revision.Error;
+
         await db.SaveAndDispatchAsync(dispatcher, ct);
         return new RequestRevisionResult(deal.Id, deal.Status, deal.LastRevisionComment ?? comment);
     }

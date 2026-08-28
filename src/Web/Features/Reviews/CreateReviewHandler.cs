@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Domain.Entities;
 using Web.Domain.Enums;
 using Web.Infrastructure.Persistence;
@@ -17,23 +17,27 @@ public sealed record ReviewDto(
 
 public sealed class CreateReviewHandler(AppDbContext db)
 {
-    public async Task<ReviewDto> HandleAsync(Guid dealId, Guid authorId, int rating, string comment, CancellationToken ct)
+    public async Task<Result<ReviewDto>> HandleAsync(Guid dealId, Guid authorId, int rating, string comment, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-        var deal = await db.Deals.FirstOrDefaultAsync(d => d.Id == dealId, ct)
-            ?? throw AppErrors.NotFound();
+        var deal = await db.Deals.FirstOrDefaultAsync(d => d.Id == dealId, ct);
+        if (deal is null)
+            return ResultErrors.NotFound();
         if (!deal.IsParticipant(authorId))
-            throw AppErrors.Forbidden();
+            return ResultErrors.Forbidden();
         if (deal.Status != DealStatus.Completed)
-            throw AppErrors.Business("Reviews are allowed only after deal completion.");
+            return ResultErrors.Business("Reviews are allowed only after deal completion.");
 
         var recipientId = deal.BuyerId == authorId ? deal.SellerId : deal.BuyerId;
         if (await db.Reviews.AnyAsync(r => r.DealId == dealId && r.AuthorId == authorId, ct))
-            throw AppErrors.Conflict("You already left a review for this deal.");
+            return ResultErrors.Conflict("You already left a review for this deal.");
 
         var utcNow = DateTime.UtcNow;
-        var review = Review.Create(dealId, authorId, recipientId, rating, comment, utcNow);
+        var reviewResult = Review.Create(dealId, authorId, recipientId, rating, comment, utcNow);
+        if (reviewResult.IsFailure) return reviewResult.Error;
+
+        var review = reviewResult.Value;
         db.Reviews.Add(review);
 
         var profile = await db.Profiles

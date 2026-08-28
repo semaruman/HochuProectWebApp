@@ -2,7 +2,7 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Web.Common.Auth;
 using Web.Common.Endpoints;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Common.Validation;
 using Web.Domain.Entities;
 using Web.Infrastructure.Notifications;
@@ -35,14 +35,21 @@ public class ChatEndpoints : IEndpoint
             CancellationToken ct) =>
         {
             take = Math.Clamp(take <= 0 ? 50 : take, 1, 100);
-            var userId = currentUser.UserId;
-            var deal = await db.Deals.AsNoTracking().FirstOrDefaultAsync(d => d.Id == dealId, ct)
-                ?? throw AppErrors.NotFound();
-            if (!deal.IsParticipant(userId))
-                throw AppErrors.Forbidden();
 
-            var conversation = await db.Conversations.AsNoTracking().FirstOrDefaultAsync(c => c.DealId == dealId, ct)
-                ?? throw AppErrors.NotFound("Conversation not found.");
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var deal = await db.Deals.AsNoTracking().FirstOrDefaultAsync(d => d.Id == dealId, ct);
+            if (deal is null)
+                return ResultErrors.NotFound().ToProblemResult();
+            if (!deal.IsParticipant(userId))
+                return ResultErrors.Forbidden().ToProblemResult();
+
+            var conversation = await db.Conversations.AsNoTracking().FirstOrDefaultAsync(c => c.DealId == dealId, ct);
+            if (conversation is null)
+                return ResultErrors.NotFound("Conversation not found.").ToProblemResult();
 
             var query = db.Messages.AsNoTracking().Where(m => m.ConversationId == conversation.Id);
             if (afterId.HasValue)
@@ -77,15 +84,24 @@ public class ChatEndpoints : IEndpoint
             INotificationService notifications,
             CancellationToken ct) =>
         {
-            await validator.ValidateOrThrowAsync(request, ct);
-            var userId = currentUser.UserId;
-            var deal = await db.Deals.FirstOrDefaultAsync(d => d.Id == dealId, ct)
-                ?? throw AppErrors.NotFound();
-            if (!deal.IsParticipant(userId))
-                throw AppErrors.Forbidden();
+            var validation = await validator.ValidateRequestAsync(request, ct);
+            if (validation.IsFailure)
+                return validation.ToHttpResult(() => Results.Ok());
 
-            var conversation = await db.Conversations.FirstOrDefaultAsync(c => c.DealId == dealId, ct)
-                ?? throw AppErrors.NotFound("Conversation not found.");
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var deal = await db.Deals.FirstOrDefaultAsync(d => d.Id == dealId, ct);
+            if (deal is null)
+                return ResultErrors.NotFound().ToProblemResult();
+            if (!deal.IsParticipant(userId))
+                return ResultErrors.Forbidden().ToProblemResult();
+
+            var conversation = await db.Conversations.FirstOrDefaultAsync(c => c.DealId == dealId, ct);
+            if (conversation is null)
+                return ResultErrors.NotFound("Conversation not found.").ToProblemResult();
 
             var message = Message.Create(conversation.Id, userId, request.Text, DateTime.UtcNow);
             db.Messages.Add(message);
@@ -110,14 +126,20 @@ public class ChatEndpoints : IEndpoint
             AppDbContext db,
             CancellationToken ct) =>
         {
-            var userId = currentUser.UserId;
-            var deal = await db.Deals.AsNoTracking().FirstOrDefaultAsync(d => d.Id == dealId, ct)
-                ?? throw AppErrors.NotFound();
-            if (!deal.IsParticipant(userId))
-                throw AppErrors.Forbidden();
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
 
-            var conversation = await db.Conversations.FirstOrDefaultAsync(c => c.DealId == dealId, ct)
-                ?? throw AppErrors.NotFound();
+            var deal = await db.Deals.AsNoTracking().FirstOrDefaultAsync(d => d.Id == dealId, ct);
+            if (deal is null)
+                return ResultErrors.NotFound().ToProblemResult();
+            if (!deal.IsParticipant(userId))
+                return ResultErrors.Forbidden().ToProblemResult();
+
+            var conversation = await db.Conversations.FirstOrDefaultAsync(c => c.DealId == dealId, ct);
+            if (conversation is null)
+                return ResultErrors.NotFound().ToProblemResult();
 
             var unread = await db.Messages
                 .Where(m => m.ConversationId == conversation.Id && m.SenderId != userId && m.ReadAt == null)

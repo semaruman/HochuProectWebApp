@@ -1,11 +1,9 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Web.Common.Auth;
 using Web.Common.Endpoints;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Domain.Entities;
-using Web.Domain.Enums;
 using Web.Infrastructure.Persistence;
 
 namespace Web.Features.Admin;
@@ -39,8 +37,10 @@ public class AdminEndpoints : IEndpoint
             UserManager<ApplicationUser> userManager,
             CancellationToken ct) =>
         {
-            var user = await userManager.FindByIdAsync(userId.ToString())
-                ?? throw AppErrors.NotFound();
+            var user = await userManager.FindByIdAsync(userId.ToString());
+            if (user is null)
+                return ResultErrors.NotFound().ToProblemResult();
+
             user.IsBlocked = true;
             await userManager.UpdateAsync(user);
             return Results.Ok(new { user.Id, user.IsBlocked });
@@ -51,8 +51,10 @@ public class AdminEndpoints : IEndpoint
             UserManager<ApplicationUser> userManager,
             CancellationToken ct) =>
         {
-            var user = await userManager.FindByIdAsync(userId.ToString())
-                ?? throw AppErrors.NotFound();
+            var user = await userManager.FindByIdAsync(userId.ToString());
+            if (user is null)
+                return ResultErrors.NotFound().ToProblemResult();
+
             user.IsBlocked = false;
             await userManager.UpdateAsync(user);
             return Results.Ok(new { user.Id, user.IsBlocked });
@@ -77,18 +79,28 @@ public class AdminEndpoints : IEndpoint
 
         group.MapPost("/projects/{id:guid}/hide", async (Guid id, AppDbContext db, CancellationToken ct) =>
         {
-            var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct)
-                ?? throw AppErrors.NotFound();
-            project.Hide(DateTime.UtcNow);
+            var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (project is null)
+                return ResultErrors.NotFound().ToProblemResult();
+
+            var hideResult = project.Hide(DateTime.UtcNow);
+            if (hideResult.IsFailure)
+                return hideResult.ToHttpResult(() => Results.Ok());
+
             await db.SaveChangesAsync(ct);
             return Results.Ok(new { project.Id, project.Status });
         });
 
         group.MapPost("/projects/{id:guid}/restore", async (Guid id, AppDbContext db, CancellationToken ct) =>
         {
-            var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct)
-                ?? throw AppErrors.NotFound();
-            project.RestorePublication(DateTime.UtcNow);
+            var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (project is null)
+                return ResultErrors.NotFound().ToProblemResult();
+
+            var restoreResult = project.RestorePublication(DateTime.UtcNow);
+            if (restoreResult.IsFailure)
+                return restoreResult.ToHttpResult(() => Results.Ok());
+
             await db.SaveChangesAsync(ct);
             return Results.Ok(new { project.Id, project.Status });
         });
@@ -97,8 +109,9 @@ public class AdminEndpoints : IEndpoint
         {
             var deal = await db.Deals.AsNoTracking()
                 .Include(d => d.Deliverables).ThenInclude(x => x.Files)
-                .FirstOrDefaultAsync(d => d.Id == id, ct)
-                ?? throw AppErrors.NotFound();
+                .FirstOrDefaultAsync(d => d.Id == id, ct);
+            if (deal is null)
+                return ResultErrors.NotFound().ToProblemResult();
 
             var projectTitle = await db.Projects.Where(p => p.Id == deal.ProjectId).Select(p => p.Title).FirstAsync(ct);
             var buyerEmail = await db.Users.Where(u => u.Id == deal.BuyerId).Select(u => u.Email).FirstAsync(ct);

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using System.Text;
 using Web.Common.Endpoints;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Common.Validation;
 using Web.Domain.Entities;
 using Web.Infrastructure.Email;
@@ -45,7 +45,10 @@ public class PasswordResetEndpoints : IEndpoint
             ILogger<PasswordResetEndpoints> logger,
             CancellationToken ct) =>
         {
-            await validator.ValidateOrThrowAsync(request, ct);
+            var validation = await validator.ValidateRequestAsync(request, ct);
+            if (validation.IsFailure)
+                return validation.ToHttpResult(() => Results.Ok());
+
             var user = await userManager.FindByEmailAsync(request.Email);
             if (user is not null)
             {
@@ -74,9 +77,13 @@ public class PasswordResetEndpoints : IEndpoint
             UserManager<ApplicationUser> userManager,
             CancellationToken ct) =>
         {
-            await validator.ValidateOrThrowAsync(request, ct);
-            var user = await userManager.FindByEmailAsync(request.Email)
-                ?? throw AppErrors.BadRequest("Invalid reset request.");
+            var validation = await validator.ValidateRequestAsync(request, ct);
+            if (validation.IsFailure)
+                return validation.ToHttpResult(() => Results.Ok());
+
+            var user = await userManager.FindByEmailAsync(request.Email);
+            if (user is null)
+                return ResultErrors.BadRequest("Invalid reset request.").ToProblemResult();
 
             string decoded;
             try
@@ -85,12 +92,12 @@ public class PasswordResetEndpoints : IEndpoint
             }
             catch
             {
-                throw AppErrors.BadRequest("Invalid token.");
+                return ResultErrors.BadRequest("Invalid token.").ToProblemResult();
             }
 
             var result = await userManager.ResetPasswordAsync(user, decoded, request.NewPassword);
             if (!result.Succeeded)
-                throw AppErrors.BadRequest("Invalid or expired reset token.");
+                return ResultErrors.BadRequest("Invalid or expired reset token.").ToProblemResult();
 
             return Results.Ok(new { message = "Password updated." });
         });

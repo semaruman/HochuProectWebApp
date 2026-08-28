@@ -1,4 +1,4 @@
-using Web.Domain.Exceptions;
+using Web.Common.Results;
 
 namespace Web.Domain.Entities;
 
@@ -20,7 +20,7 @@ public class Review
     public ApplicationUser Author { get; private set; } = null!;
     public ApplicationUser Recipient { get; private set; } = null!;
 
-    public static Review Create(
+    public static Result<Review> Create(
         Guid dealId,
         Guid authorId,
         Guid recipientId,
@@ -29,11 +29,11 @@ public class Review
         DateTime utcNow)
     {
         if (authorId == recipientId)
-            throw new DomainException("Cannot review yourself.");
+            return ResultErrors.Business("Cannot review yourself.");
         if (rating is < 1 or > 5)
-            throw new DomainException("Rating must be between 1 and 5.");
+            return ResultErrors.Business("Rating must be between 1 and 5.");
         if (string.IsNullOrWhiteSpace(comment) || comment.Trim().Length < 5)
-            throw new DomainException("Comment is too short.");
+            return ResultErrors.Business("Comment is too short.");
 
         return new Review
         {

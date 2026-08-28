@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Web.Common.Auth;
 using Web.Common.Endpoints;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Infrastructure.Persistence;
 
 namespace Web.Features.Deals;
@@ -17,7 +17,11 @@ public class DealsEndpoints : IEndpoint
 
         group.MapGet("/mine", async (ICurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
         {
-            var userId = currentUser.UserId;
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
             var deals = await db.Deals.AsNoTracking()
                 .Where(d => d.BuyerId == userId || d.SellerId == userId)
                 .OrderByDescending(d => d.CreatedAt)
@@ -40,13 +44,18 @@ public class DealsEndpoints : IEndpoint
 
         group.MapGet("/{id:guid}", async (Guid id, ICurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
         {
-            var userId = currentUser.UserId;
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
             var deal = await db.Deals.AsNoTracking()
                 .Include(d => d.Deliverables).ThenInclude(x => x.Files)
-                .FirstOrDefaultAsync(d => d.Id == id, ct)
-                ?? throw AppErrors.NotFound();
+                .FirstOrDefaultAsync(d => d.Id == id, ct);
+            if (deal is null)
+                return ResultErrors.NotFound().ToProblemResult();
             if (!deal.IsParticipant(userId))
-                throw AppErrors.Forbidden();
+                return ResultErrors.Forbidden().ToProblemResult();
 
             var projectTitle = await db.Projects.Where(p => p.Id == deal.ProjectId).Select(p => p.Title).FirstAsync(ct);
             return Results.Ok(new DealDetailsDto(
@@ -78,8 +87,11 @@ public class DealsEndpoints : IEndpoint
             FundDealHandler handler,
             CancellationToken ct) =>
         {
-            var result = await handler.HandleAsync(id, currentUser.UserId, ct);
-            return Results.Ok(result);
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var result = await handler.HandleAsync(id, userIdResult.Value, ct);
+            return result.ToHttpResult(v => Results.Ok(v));
         });
 
         group.MapPost("/{id:guid}/submit", async (
@@ -89,6 +101,10 @@ public class DealsEndpoints : IEndpoint
             SubmitWorkHandler handler,
             CancellationToken ct) =>
         {
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+
             string? message = null;
             List<DeliverableUpload>? uploads = null;
             if (request.HasFormContentType)
@@ -104,8 +120,8 @@ public class DealsEndpoints : IEndpoint
                 message = body?.Message;
             }
 
-            var result = await handler.HandleAsync(id, currentUser.UserId, message, uploads, ct);
-            return Results.Ok(result);
+            var result = await handler.HandleAsync(id, userIdResult.Value, message, uploads, ct);
+            return result.ToHttpResult(v => Results.Ok(v));
         });
 
         group.MapPost("/{id:guid}/accept", async (
@@ -114,8 +130,11 @@ public class DealsEndpoints : IEndpoint
             AcceptWorkHandler handler,
             CancellationToken ct) =>
         {
-            var result = await handler.HandleAsync(id, currentUser.UserId, ct);
-            return Results.Ok(result);
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var result = await handler.HandleAsync(id, userIdResult.Value, ct);
+            return result.ToHttpResult(v => Results.Ok(v));
         });
 
         group.MapPost("/{id:guid}/request-revision", async (
@@ -125,8 +144,11 @@ public class DealsEndpoints : IEndpoint
             RequestRevisionHandler handler,
             CancellationToken ct) =>
         {
-            var result = await handler.HandleAsync(id, currentUser.UserId, request.Comment, ct);
-            return Results.Ok(result);
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var result = await handler.HandleAsync(id, userIdResult.Value, request.Comment, ct);
+            return result.ToHttpResult(v => Results.Ok(v));
         }).RequireAuthorization();
 
         group.MapPost("/{id:guid}/cancel", async (
@@ -135,8 +157,11 @@ public class DealsEndpoints : IEndpoint
             CancelDealHandler handler,
             CancellationToken ct) =>
         {
-            var result = await handler.HandleAsync(id, currentUser.UserId, ct);
-            return Results.Ok(result);
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var result = await handler.HandleAsync(id, userIdResult.Value, ct);
+            return result.ToHttpResult(v => Results.Ok(v));
         });
     }
 }

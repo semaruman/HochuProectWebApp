@@ -2,7 +2,7 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Web.Common.Auth;
 using Web.Common.Endpoints;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Common.Validation;
 using Web.Domain.Entities;
 using Web.Infrastructure.Files;
@@ -31,13 +31,18 @@ public class ProfilesEndpoints : IEndpoint
 
         group.MapGet("/me", async (ICurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
         {
-            var userId = currentUser.UserId;
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
             var profile = await db.Profiles
                 .Include(p => p.User)
                 .Include(p => p.UserSkills).ThenInclude(us => us.Skill)
                 .Include(p => p.PortfolioItems)
-                .FirstOrDefaultAsync(p => p.UserId == userId, ct)
-                ?? throw AppErrors.NotFound("Profile not found.");
+                .FirstOrDefaultAsync(p => p.UserId == userId, ct);
+            if (profile is null)
+                return ResultErrors.NotFound("Profile not found.").ToProblemResult();
 
             return Results.Ok(MapProfile(profile, includePrivate: true));
         }).RequireAuthorization();
@@ -49,11 +54,23 @@ public class ProfilesEndpoints : IEndpoint
             AppDbContext db,
             CancellationToken ct) =>
         {
-            await validator.ValidateOrThrowAsync(request, ct);
-            var userId = currentUser.UserId;
-            var profile = await db.Profiles.FirstOrDefaultAsync(p => p.UserId == userId, ct)
-                ?? throw AppErrors.NotFound("Profile not found.");
-            profile.Update(request.DisplayName, request.Bio, DateTime.UtcNow);
+            var validation = await validator.ValidateRequestAsync(request, ct);
+            if (validation.IsFailure)
+                return validation.ToHttpResult(() => Results.Ok());
+
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var profile = await db.Profiles.FirstOrDefaultAsync(p => p.UserId == userId, ct);
+            if (profile is null)
+                return ResultErrors.NotFound("Profile not found.").ToProblemResult();
+
+            var updateResult = profile.Update(request.DisplayName, request.Bio, DateTime.UtcNow);
+            if (updateResult.IsFailure)
+                return updateResult.ToHttpResult(() => Results.Ok());
+
             await db.SaveChangesAsync(ct);
             return Results.Ok(new { profile.UserId, profile.DisplayName, profile.Bio });
         }).RequireAuthorization();
@@ -64,9 +81,13 @@ public class ProfilesEndpoints : IEndpoint
             AppDbContext db,
             CancellationToken ct) =>
         {
-            var userId = currentUser.UserId;
-            _ = await db.Profiles.FirstOrDefaultAsync(p => p.UserId == userId, ct)
-                ?? throw AppErrors.NotFound("Profile not found.");
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            if (await db.Profiles.FirstOrDefaultAsync(p => p.UserId == userId, ct) is null)
+                return ResultErrors.NotFound("Profile not found.").ToProblemResult();
 
             var names = request.Skills
                 .Where(s => !string.IsNullOrWhiteSpace(s))
@@ -101,11 +122,16 @@ public class ProfilesEndpoints : IEndpoint
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.Title))
-                throw AppErrors.BadRequest("Title is required.");
-            var userId = currentUser.UserId;
+                return ResultErrors.BadRequest("Title is required.").ToProblemResult();
+
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
             var count = await db.PortfolioItems.CountAsync(p => p.UserId == userId, ct);
             if (count >= 10)
-                throw AppErrors.Business("Portfolio limit reached (10).");
+                return ResultErrors.Business("Portfolio limit reached (10).").ToProblemResult();
 
             var item = new PortfolioItem
             {
@@ -123,9 +149,15 @@ public class ProfilesEndpoints : IEndpoint
 
         group.MapDelete("/me/portfolio/{id:guid}", async (Guid id, ICurrentUser currentUser, AppDbContext db, CancellationToken ct) =>
         {
-            var userId = currentUser.UserId;
-            var item = await db.PortfolioItems.FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId, ct)
-                ?? throw AppErrors.NotFound();
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var item = await db.PortfolioItems.FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId, ct);
+            if (item is null)
+                return ResultErrors.NotFound().ToProblemResult();
+
             db.PortfolioItems.Remove(item);
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
@@ -138,16 +170,28 @@ public class ProfilesEndpoints : IEndpoint
             IFileStorage files,
             CancellationToken ct) =>
         {
-            var userId = currentUser.UserId;
-            var profile = await db.Profiles.FirstOrDefaultAsync(p => p.UserId == userId, ct)
-                ?? throw AppErrors.NotFound();
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var profile = await db.Profiles.FirstOrDefaultAsync(p => p.UserId == userId, ct);
+            if (profile is null)
+                return ResultErrors.NotFound().ToProblemResult();
+
             if (!request.HasFormContentType)
-                throw AppErrors.BadRequest("Multipart form expected.");
-            var file = request.Form.Files.FirstOrDefault()
-                ?? throw AppErrors.BadRequest("File required.");
+                return ResultErrors.BadRequest("Multipart form expected.").ToProblemResult();
+
+            var file = request.Form.Files.FirstOrDefault();
+            if (file is null)
+                return ResultErrors.BadRequest("File required.").ToProblemResult();
+
             await using var stream = file.OpenReadStream();
-            var stored = await files.SaveAsync(stream, file.FileName, file.ContentType, $"avatars/{userId}", ct);
-            profile.SetAvatar(stored.StorageKey, DateTime.UtcNow);
+            var storedResult = await files.SaveAsync(stream, file.FileName, file.ContentType, $"avatars/{userId}", ct);
+            if (storedResult.IsFailure)
+                return storedResult.ToHttpResult(_ => Results.Ok());
+
+            profile.SetAvatar(storedResult.Value.StorageKey, DateTime.UtcNow);
             await db.SaveChangesAsync(ct);
             return Results.Ok(new { profile.AvatarPath });
         }).RequireAuthorization();
@@ -157,8 +201,10 @@ public class ProfilesEndpoints : IEndpoint
             var profile = await db.Profiles
                 .Include(p => p.UserSkills).ThenInclude(us => us.Skill)
                 .Include(p => p.PortfolioItems)
-                .FirstOrDefaultAsync(p => p.UserId == userId, ct)
-                ?? throw AppErrors.NotFound("Profile not found.");
+                .FirstOrDefaultAsync(p => p.UserId == userId, ct);
+            if (profile is null)
+                return ResultErrors.NotFound("Profile not found.").ToProblemResult();
+
             return Results.Ok(MapProfile(profile, includePrivate: false));
         });
     }

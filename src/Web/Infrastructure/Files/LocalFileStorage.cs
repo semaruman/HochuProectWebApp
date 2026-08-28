@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Options;
-using Web.Common.Errors;
+using Web.Common.Results;
 
 namespace Web.Infrastructure.Files;
 
@@ -23,14 +23,14 @@ public class LocalFileStorage(IOptions<FileStorageOptions> options, IWebHostEnvi
             ? _options.Root
             : Path.Combine(env.ContentRootPath, _options.Root);
 
-    public async Task<StoredFile> SaveAsync(Stream content, string fileName, string contentType, string folder, CancellationToken ct = default)
+    public async Task<Result<StoredFile>> SaveAsync(Stream content, string fileName, string contentType, string folder, CancellationToken ct = default)
     {
         var ext = Path.GetExtension(fileName).ToLowerInvariant();
         if (!_options.AllowedExtensions.Contains(ext))
-            throw AppErrors.BadRequest($"File type '{ext}' is not allowed.");
+            return ResultErrors.BadRequest($"File type '{ext}' is not allowed.");
 
         if (content.CanSeek && content.Length > _options.MaxFileBytes)
-            throw AppErrors.BadRequest("File is too large.");
+            return ResultErrors.BadRequest("File is too large.");
 
         var safeName = Path.GetFileName(fileName);
         var key = $"{folder.Trim('/')}/{Guid.NewGuid():N}_{safeName}";
@@ -44,7 +44,7 @@ public class LocalFileStorage(IOptions<FileStorageOptions> options, IWebHostEnvi
         {
             fs.Close();
             File.Delete(fullPath);
-            throw new InvalidOperationException("File is too large.");
+            return ResultErrors.BadRequest("File is too large.");
         }
 
         return new StoredFile(key, safeName, contentType, size);

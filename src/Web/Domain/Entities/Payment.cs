@@ -1,5 +1,5 @@
+using Web.Common.Results;
 using Web.Domain.Enums;
-using Web.Domain.Exceptions;
 
 namespace Web.Domain.Entities;
 
@@ -20,7 +20,7 @@ public class Payment
 
     public Deal Deal { get; private set; } = null!;
 
-    public static Payment Authorize(
+    public static Result<Payment> Authorize(
         Guid dealId,
         decimal amount,
         string provider,
@@ -28,13 +28,13 @@ public class Payment
         DateTime utcNow)
     {
         if (dealId == Guid.Empty)
-            throw new DomainException("Deal is required.");
+            return ResultErrors.Business("Deal is required.");
         if (amount <= 0)
-            throw new DomainException("Payment amount must be greater than zero.");
+            return ResultErrors.Business("Payment amount must be greater than zero.");
         if (string.IsNullOrWhiteSpace(provider))
-            throw new DomainException("Payment provider is required.");
+            return ResultErrors.Business("Payment provider is required.");
         if (string.IsNullOrWhiteSpace(providerPaymentId))
-            throw new DomainException("Provider payment id is required.");
+            return ResultErrors.Business("Provider payment id is required.");
 
         return new Payment
         {
@@ -49,19 +49,21 @@ public class Payment
         };
     }
 
-    public void MarkCaptured(DateTime utcNow)
+    public Result MarkCaptured(DateTime utcNow)
     {
         if (Status != PaymentStatus.Authorized)
-            throw new DomainException("Only authorized payments can be captured.");
+            return ResultErrors.Business("Only authorized payments can be captured.");
         Status = PaymentStatus.Captured;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
-    public void MarkRefunded(DateTime utcNow)
+    public Result MarkRefunded(DateTime utcNow)
     {
         if (Status != PaymentStatus.Authorized)
-            throw new DomainException("Only authorized payments can be refunded.");
+            return ResultErrors.Business("Only authorized payments can be refunded.");
         Status = PaymentStatus.Refunded;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 }

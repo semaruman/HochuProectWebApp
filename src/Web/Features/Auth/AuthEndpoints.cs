@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 using System.Text;
 using Web.Common.Auth;
 using Web.Common.Endpoints;
-using Web.Common.Errors;
+using Web.Common.Results;
 using Web.Common.Validation;
 using Web.Domain.Entities;
 using Web.Infrastructure.Email;
@@ -55,7 +55,9 @@ public class AuthEndpoints : IEndpoint
             IOptions<AppOptions> appOptions,
             CancellationToken ct) =>
         {
-            await validator.ValidateOrThrowAsync(request, ct);
+            var validation = await validator.ValidateRequestAsync(request, ct);
+            if (validation.IsFailure)
+                return validation.ToHttpResult(() => Results.Ok());
 
             var utcNow = DateTime.UtcNow;
             var user = new ApplicationUser
@@ -70,9 +72,13 @@ public class AuthEndpoints : IEndpoint
 
             var result = await userManager.CreateAsync(user, request.Password);
             if (!result.Succeeded)
-                throw AppErrors.BadRequest(string.Join("; ", result.Errors.Select(e => e.Description)));
+                return ResultErrors.BadRequest(string.Join("; ", result.Errors.Select(e => e.Description))).ToProblemResult();
 
-            db.Profiles.Add(Profile.Create(user.Id, request.DisplayName, utcNow));
+            var profileResult = Profile.Create(user.Id, request.DisplayName, utcNow);
+            if (profileResult.IsFailure)
+                return profileResult.ToHttpResult(_ => Results.Ok());
+
+            db.Profiles.Add(profileResult.Value);
             await db.SaveChangesAsync(ct);
 
             if (!user.EmailConfirmed)
@@ -110,14 +116,17 @@ public class AuthEndpoints : IEndpoint
             UserManager<ApplicationUser> userManager,
             CancellationToken ct) =>
         {
-            await validator.ValidateOrThrowAsync(request, ct);
+            var validation = await validator.ValidateRequestAsync(request, ct);
+            if (validation.IsFailure)
+                return validation.ToHttpResult(() => Results.Ok());
+
             var user = await userManager.FindByEmailAsync(request.Email);
             if (user?.IsBlocked == true)
-                throw AppErrors.Forbidden("Account is blocked.");
+                return ResultErrors.Forbidden("Account is blocked.").ToProblemResult();
 
             var result = await signInManager.PasswordSignInAsync(request.Email, request.Password, true, lockoutOnFailure: true);
             if (!result.Succeeded)
-                throw AppErrors.BadRequest("Invalid email or password.");
+                return ResultErrors.BadRequest("Invalid email or password.").ToProblemResult();
             return Results.Ok(new { message = "Logged in" });
         });
 
@@ -129,10 +138,15 @@ public class AuthEndpoints : IEndpoint
 
         group.MapGet("/me", async (ICurrentUser currentUser, UserManager<ApplicationUser> userManager) =>
         {
-            var user = await userManager.FindByIdAsync(currentUser.UserId.ToString());
+            var userIdResult = currentUser.GetUserId();
+            if (userIdResult.IsFailure)
+                return userIdResult.ToHttpResult(_ => Results.Ok());
+            var userId = userIdResult.Value;
+
+            var user = await userManager.FindByIdAsync(userId.ToString());
             return Results.Ok(new
             {
-                userId = currentUser.UserId,
+                userId,
                 email = user?.Email,
                 emailConfirmed = user?.EmailConfirmed == true,
                 isBlocked = user?.IsBlocked == true
@@ -143,8 +157,9 @@ public class AuthEndpoints : IEndpoint
             ConfirmEmailRequest request,
             UserManager<ApplicationUser> userManager) =>
         {
-            var user = await userManager.FindByIdAsync(request.UserId.ToString())
-                ?? throw AppErrors.BadRequest("Invalid confirmation request.");
+            var user = await userManager.FindByIdAsync(request.UserId.ToString());
+            if (user is null)
+                return ResultErrors.BadRequest("Invalid confirmation request.").ToProblemResult();
 
             string decoded;
             try
@@ -153,12 +168,12 @@ public class AuthEndpoints : IEndpoint
             }
             catch
             {
-                throw AppErrors.BadRequest("Invalid token.");
+                return ResultErrors.BadRequest("Invalid token.").ToProblemResult();
             }
 
             var result = await userManager.ConfirmEmailAsync(user, decoded);
             if (!result.Succeeded)
-                throw AppErrors.BadRequest("Invalid or expired confirmation token.");
+                return ResultErrors.BadRequest("Invalid or expired confirmation token.").ToProblemResult();
 
             return Results.Ok(new { message = "Email confirmed." });
         });

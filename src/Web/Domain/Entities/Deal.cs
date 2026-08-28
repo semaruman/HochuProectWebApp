@@ -1,6 +1,6 @@
+using Web.Common.Results;
 using Web.Domain.Enums;
 using Web.Domain.Events;
-using Web.Domain.Exceptions;
 
 namespace Web.Domain.Entities;
 
@@ -42,10 +42,10 @@ public class Deal : Entity
     public bool CanSubmitWork => Status is DealStatus.InProgress or DealStatus.RevisionRequired;
     public bool AwaitingBuyerReview => Status == DealStatus.Submitted;
 
-    public static Deal FromAcceptedBid(Project project, Bid bid, DateTime utcNow)
+    public static Result<Deal> FromAcceptedBid(Project project, Bid bid, DateTime utcNow)
     {
         if (bid.ProjectId != project.Id)
-            throw new DomainException("Bid does not belong to this project.");
+            return ResultErrors.Business("Bid does not belong to this project.");
 
         var deal = new Deal
         {
@@ -63,21 +63,22 @@ public class Deal : Entity
         return deal;
     }
 
-    public void Fund(DateTime utcNow)
+    public Result Fund(DateTime utcNow)
     {
         if (Status == DealStatus.InProgress && FundedAt is not null)
-            return;
+            return Result.Success();
         if (Status != DealStatus.Created)
-            throw new DomainException("Only created deals can be funded.");
+            return ResultErrors.Business("Only created deals can be funded.");
         Status = DealStatus.InProgress;
         FundedAt = utcNow;
         Raise(new DealFunded(Id, BuyerId, SellerId, Amount, utcNow));
+        return Result.Success();
     }
 
-    public DealDeliverable SubmitWork(string? message, DateTime utcNow)
+    public Result<DealDeliverable> SubmitWork(string? message, DateTime utcNow)
     {
         if (!CanSubmitWork)
-            throw new DomainException("Deal is not ready for work submission.");
+            return ResultErrors.Business("Deal is not ready for work submission.");
         Status = DealStatus.Submitted;
         SubmittedAt = utcNow;
         RevisionRequestedAt = null;
@@ -87,35 +88,38 @@ public class Deal : Entity
         return deliverable;
     }
 
-    public void RequestRevision(string comment, DateTime utcNow)
+    public Result RequestRevision(string comment, DateTime utcNow)
     {
         if (Status != DealStatus.Submitted)
-            throw new DomainException("Only submitted deals can be returned for revision.");
+            return ResultErrors.Business("Only submitted deals can be returned for revision.");
         if (string.IsNullOrWhiteSpace(comment) || comment.Trim().Length < 5)
-            throw new DomainException("Revision comment is too short.");
+            return ResultErrors.Business("Revision comment is too short.");
         Status = DealStatus.RevisionRequired;
         RevisionRequestedAt = utcNow;
         LastRevisionComment = comment.Trim();
         Raise(new WorkRevisionRequested(Id, BuyerId, SellerId, LastRevisionComment, utcNow));
+        return Result.Success();
     }
 
-    public void Accept(DateTime utcNow)
+    public Result Accept(DateTime utcNow)
     {
         if (Status != DealStatus.Submitted)
-            throw new DomainException("Only submitted deals can be accepted.");
+            return ResultErrors.Business("Only submitted deals can be accepted.");
         Status = DealStatus.Completed;
         CompletedAt = utcNow;
         Raise(new DealCompleted(Id, BuyerId, SellerId, Payment?.Id, utcNow));
+        return Result.Success();
     }
 
-    public void Cancel(Guid actorId, DateTime utcNow)
+    public Result Cancel(Guid actorId, DateTime utcNow)
     {
         if (Status is DealStatus.Completed or DealStatus.Cancelled)
-            throw new DomainException("Deal cannot be cancelled in its current status.");
+            return ResultErrors.Business("Deal cannot be cancelled in its current status.");
         if (!IsParticipant(actorId))
-            throw new DomainException("Only deal participants can cancel the deal.");
+            return ResultErrors.Business("Only deal participants can cancel the deal.");
         Status = DealStatus.Cancelled;
         CancelledAt = utcNow;
         Raise(new DealCancelled(Id, actorId, BuyerId, SellerId, utcNow));
+        return Result.Success();
     }
 }

@@ -1,5 +1,5 @@
+using Web.Common.Results;
 using Web.Domain.Enums;
-using Web.Domain.Exceptions;
 using Web.Domain.ValueObjects;
 
 namespace Web.Domain.Entities;
@@ -24,7 +24,7 @@ public class Service
     public ApplicationUser Seller { get; private set; } = null!;
     public Category Category { get; private set; } = null!;
 
-    public static Service Create(
+    public static Result<Service> Create(
         Guid sellerId,
         Guid categoryId,
         string title,
@@ -34,15 +34,15 @@ public class Service
         DateTime utcNow)
     {
         if (sellerId == Guid.Empty)
-            throw new DomainException("Seller is required.");
+            return ResultErrors.Business("Seller is required.");
         if (categoryId == Guid.Empty)
-            throw new DomainException("Category is required.");
+            return ResultErrors.Business("Category is required.");
         if (string.IsNullOrWhiteSpace(title) || title.Trim().Length < 5)
-            throw new DomainException("Title is too short.");
+            return ResultErrors.Business("Title is too short.");
         if (string.IsNullOrWhiteSpace(description) || description.Trim().Length < 20)
-            throw new DomainException("Description is too short.");
+            return ResultErrors.Business("Description is too short.");
         if (deliveryDays is <= 0 or > 3650)
-            throw new DomainException("Delivery days are out of range.");
+            return ResultErrors.Business("Delivery days are out of range.");
 
         return new Service
         {
@@ -59,18 +59,18 @@ public class Service
         };
     }
 
-    public void Update(string title, string description, Guid categoryId, Money price, int deliveryDays, DateTime utcNow)
+    public Result Update(string title, string description, Guid categoryId, Money price, int deliveryDays, DateTime utcNow)
     {
         if (Status == ServiceStatus.Archived)
-            throw new DomainException("Archived service cannot be edited.");
+            return ResultErrors.Business("Archived service cannot be edited.");
         if (categoryId == Guid.Empty)
-            throw new DomainException("Category is required.");
+            return ResultErrors.Business("Category is required.");
         if (string.IsNullOrWhiteSpace(title) || title.Trim().Length < 5)
-            throw new DomainException("Title is too short.");
+            return ResultErrors.Business("Title is too short.");
         if (string.IsNullOrWhiteSpace(description) || description.Trim().Length < 20)
-            throw new DomainException("Description is too short.");
+            return ResultErrors.Business("Description is too short.");
         if (deliveryDays is <= 0 or > 3650)
-            throw new DomainException("Delivery days are out of range.");
+            return ResultErrors.Business("Delivery days are out of range.");
 
         Title = title.Trim();
         Description = description.Trim();
@@ -78,19 +78,22 @@ public class Service
         Price = price.Amount;
         DeliveryDays = deliveryDays;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
-    public void Publish(DateTime utcNow)
+    public Result Publish(DateTime utcNow)
     {
         if (Status == ServiceStatus.Archived)
-            throw new DomainException("Archived service cannot be published.");
+            return ResultErrors.Business("Archived service cannot be published.");
         Status = ServiceStatus.Published;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 
-    public void Archive(DateTime utcNow)
+    public Result Archive(DateTime utcNow)
     {
         Status = ServiceStatus.Archived;
         UpdatedAt = utcNow;
+        return Result.Success();
     }
 }
