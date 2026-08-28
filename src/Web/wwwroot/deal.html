@@ -15,6 +15,7 @@
   </main>
   <footer class="site-footer" id="site-footer"></footer>
   <script src="/js/api.js"></script>
+  <script src="/js/effects.js"></script>
   <script src="/js/app.js"></script>
   <script>
     const id = HochuApp.qs("id");
@@ -76,8 +77,9 @@
           </div>`).join("") || `<div class="empty">Сдач пока нет.</div>`;
 
         root.innerHTML = `
-          <div class="page-head">
+          <div class="page-head reveal">
             <div>
+              <p class="section__label">Deal workspace</p>
               <h1>${HochuApp.escapeHtml(deal.projectTitle)}</h1>
               <p>${HochuApp.statusBadge(HochuApp.DEAL_STATUS, deal.status, true)} · ${HochuApp.money(deal.amount)}</p>
             </div>
@@ -87,7 +89,7 @@
               ${actions}
             </div>
           </div>
-          <div class="panel" style="margin-bottom:1rem">
+          <div class="panel reveal" style="margin-bottom:1rem">
             <p class="muted" style="margin:0"><strong>Следующий шаг:</strong> ${HochuApp.escapeHtml(next)}</p>
             ${waitingDays >= 3 ? `<p class="hint" style="margin:0.5rem 0 0">Работа ожидает проверки уже ${waitingDays} дн. Если возникли вопросы — напишите в чат.</p>` : ""}
           </div>
@@ -146,6 +148,7 @@
           </div>`;
 
         await loadMessages(userId);
+        if (window.HochuEffects) HochuEffects.mountReveal();
 
         document.getElementById("send")?.addEventListener("click", async () => {
           const text = document.getElementById("msg").value.trim();

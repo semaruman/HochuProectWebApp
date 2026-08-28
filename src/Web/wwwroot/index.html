@@ -3,50 +3,94 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Хочу Проект</title>
+  <meta name="description" content="Премиальная инженерная биржа: проекты, исполнители, сделки от ТЗ до приёмки." />
+  <title>Хочу Проект — инженерная биржа</title>
   <link rel="stylesheet" href="/css/site.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
 </head>
-<body>
+<body class="page-hero">
   <header class="site-header" id="site-header"></header>
-  <main>
-    <section class="hero">
-      <div class="hero__media" aria-hidden="true"></div>
-      <div class="hero__grid" aria-hidden="true"></div>
-      <div class="hero__content">
-        <p class="hero__brand">Хочу Проект</p>
-        <h1 class="hero__lead">Инженерная биржа: от чертежа до готовой модели и КД</h1>
-        <p class="hero__sub">Опубликуйте задачу, получите отклики инженеров, зафиксируйте сделку и доведите работу до приёмки.</p>
+
+  <section class="hero" aria-label="Главный экран">
+    <div class="hero__visual" id="hero-3d" aria-hidden="true">
+      <div class="hero__ring"></div>
+    </div>
+    <div class="hero__inner">
+      <div class="hero__copy">
+        <p class="hero__badge">Engineering × Freelance</p>
+        <h1 class="hero__title">Где инженерные таланты встречают амбициозные проекты</h1>
+        <p class="hero__sub">Опубликуйте задачу, получите отклики специалистов, ведите сделку и примите результат — в едином precision-workspace.</p>
         <div class="hero__actions">
           <a class="btn btn-primary" href="/create-project.html">Создать проект</a>
           <a class="btn btn-ghost" href="/projects.html">Смотреть проекты</a>
+          <a class="btn btn-ghost" href="/services.html">Найти услуги</a>
+        </div>
+        <div class="hero__stats">
+          <div class="hero__stat">
+            <strong>CAD · FEM · КД</strong>
+            3D-моделирование и расчёты
+          </div>
+          <div class="hero__stat">
+            <strong>Deal flow</strong>
+            От отклика до приёмки
+          </div>
+          <div class="hero__stat">
+            <strong>Secure</strong>
+            Сделки и deliverables
+          </div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="section">
-      <h2>Как это работает</h2>
-      <p>Короткий путь от ТЗ до результата без лишних статусов.</p>
-      <div class="list">
-        <div class="item">
-          <div class="item__title">1. Публикация</div>
-          <div class="item__meta">Опишите задачу, бюджет и срок — проект появится в ленте.</div>
-        </div>
-        <div class="item">
-          <div class="item__title">2. Отклики</div>
-          <div class="item__meta">Исполнители предлагают цену и срок, вы выбираете лучший вариант.</div>
-        </div>
-        <div class="item">
-          <div class="item__title">3. Сделка и приёмка</div>
-          <div class="item__meta">Чат, сдача работы, приёмка или доработка и отзыв после завершения.</div>
-        </div>
+  <section class="section reveal">
+    <p class="section__label">Workflow</p>
+    <h2>Как это работает</h2>
+    <p>Короткий путь от технического задания до готового результата — без лишних статусов и тупиков.</p>
+    <div class="steps">
+      <div class="step-card glass-card">
+        <div class="step-card__num">01 — Publish</div>
+        <h3>Публикация</h3>
+        <p>Опишите задачу, бюджет и срок — проект появится в ленте для инженеров.</p>
       </div>
-    </section>
-  </main>
+      <div class="step-card glass-card">
+        <div class="step-card__num">02 — Proposals</div>
+        <h3>Отклики</h3>
+        <p>Исполнители предлагают цену и срок. Вы выбираете лучший вариант по компетенциям.</p>
+      </div>
+      <div class="step-card glass-card">
+        <div class="step-card__num">03 — Delivery</div>
+        <h3>Сделка и приёмка</h3>
+        <p>Чат, сдача файлов, приёмка или доработка и отзыв после завершения.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section reveal" style="margin-bottom:var(--space-16)">
+    <p class="section__label">Explore</p>
+    <h2>Начните сейчас</h2>
+    <p>Найдите проект или опубликуйте своё техническое задание.</p>
+    <div class="row">
+      <a class="btn btn-primary" href="/projects.html">Каталог проектов</a>
+      <a class="btn btn-ghost" href="/register.html">Создать аккаунт</a>
+    </div>
+  </section>
+
   <footer class="site-footer" id="site-footer"></footer>
+
   <script src="/js/api.js"></script>
+  <script src="/js/effects.js"></script>
   <script src="/js/app.js"></script>
-  <script>
+  <script type="module">
+    import { initHeroScene } from "/js/scene3d.js";
     HochuApp.mountShell({ active: "home" });
+    initHeroScene(document.getElementById("hero-3d"));
   </script>
 </body>
 </html>

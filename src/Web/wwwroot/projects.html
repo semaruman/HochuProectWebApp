@@ -10,23 +10,35 @@
   <header class="site-header" id="site-header"></header>
   <main class="main">
     <div class="wrap">
-      <div class="page-head">
+      <div class="page-head reveal">
         <div>
-          <h1>Проекты</h1>
-          <p>Открытые инженерные задачи на площадке.</p>
+          <p class="section__label">Projects</p>
+          <h1>Инженерные проекты</h1>
+          <p>Открытые задачи на площадке — от 3D-моделирования до расчётов.</p>
         </div>
         <a class="btn btn-primary" href="/create-project.html">Создать проект</a>
       </div>
-      <div class="toolbar">
-        <input class="input" id="q" type="search" placeholder="Поиск по названию" />
-        <select class="select" id="category"></select>
+
+      <div class="toolbar reveal">
+        <label class="search-glass" style="flex:1;max-width:520px">
+          <span class="search-glass__icon" aria-hidden="true">⌕</span>
+          <input class="input" id="q" type="search" placeholder="Поиск по названию, навыкам, дисциплине…" autocomplete="off" />
+          <kbd class="search-glass__kbd">/</kbd>
+        </label>
+        <select class="select" id="category" aria-label="Категория"></select>
         <button class="btn btn-ghost" id="reload" type="button">Обновить</button>
       </div>
-      <div class="list" id="list"><div class="skeleton"></div><div class="skeleton"></div></div>
+
+      <div class="list list--grid" id="list">
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+      </div>
     </div>
   </main>
   <footer class="site-footer" id="site-footer"></footer>
   <script src="/js/api.js"></script>
+  <script src="/js/effects.js"></script>
   <script src="/js/app.js"></script>
   <script>
     async function loadCategories() {
@@ -38,7 +50,7 @@
 
     async function loadProjects() {
       const list = document.getElementById("list");
-      list.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div>`;
+      list.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>`;
       const q = document.getElementById("q").value.trim();
       const categoryId = document.getElementById("category").value;
       const params = new URLSearchParams({ page: "1", pageSize: "30" });
@@ -47,21 +59,21 @@
       try {
         const data = await HochuApi.get(`/api/projects?${params}`);
         if (!data.items?.length) {
-          list.innerHTML = `<div class="empty">Пока нет опубликованных проектов.</div>`;
+          list.innerHTML = `
+            <div class="empty glass-card" style="grid-column:1/-1">
+              <div class="empty__icon">◇</div>
+              <p>Пока нет опубликованных проектов.</p>
+              <a class="btn btn-primary" href="/create-project.html" style="margin-top:var(--space-4)">Создать первый проект</a>
+            </div>`;
           return;
         }
-        list.innerHTML = data.items.map(p => `
-          <a class="item" href="/project.html?id=${p.id}">
-            <div class="item__title">${HochuApp.escapeHtml(p.title)}</div>
-            <div class="item__meta">
-              ${HochuApp.statusBadge(HochuApp.PROJECT_STATUS, p.status, true)}
-              <span>${HochuApp.money(p.budgetAmount, p.currency)}</span>
-              <span>до ${HochuApp.escapeHtml(p.deadline)}</span>
-              <span>${HochuApp.escapeHtml(p.category?.name || "")}</span>
-            </div>
-          </a>`).join("");
+        list.innerHTML = data.items.map(p => HochuApp.projectCard(p)).join("");
+        if (window.HochuEffects) {
+          HochuEffects.mountReveal();
+          HochuEffects.mountCardTilt();
+        }
       } catch (err) {
-        list.innerHTML = `<div class="empty">${HochuApp.escapeHtml(err.message)}</div>`;
+        list.innerHTML = `<div class="empty glass-card" style="grid-column:1/-1">${HochuApp.escapeHtml(err.message)}</div>`;
       }
     }
 

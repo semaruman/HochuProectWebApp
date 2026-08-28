@@ -1,0 +1,87 @@
+/* Liquid Glass — Design Tokens */
+:root {
+  /* Space */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Radius */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+
+  /* Color — deep space */
+  --bg-void: #05070d;
+  --bg-deep: #0a0e17;
+  --bg-elevated: #101622;
+  --ink: #eef2f8;
+  --ink-muted: rgba(238, 242, 248, 0.62);
+  --ink-faint: rgba(238, 242, 248, 0.38);
+
+  /* Accents — restrained */
+  --accent: #5eead4;
+  --accent-soft: rgba(94, 234, 212, 0.14);
+  --accent-glow: rgba(94, 234, 212, 0.35);
+  --cyan: #67e8f9;
+  --blue: #7dd3fc;
+  --violet: #a78bfa;
+
+  /* Semantic */
+  --danger: #f87171;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+
+  /* Glass */
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-bg-strong: rgba(255, 255, 255, 0.1);
+  --glass-bg-hover: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-border-bright: rgba(255, 255, 255, 0.28);
+  --glass-highlight: rgba(255, 255, 255, 0.22);
+  --glass-blur: 20px;
+  --glass-blur-heavy: 40px;
+  --glass-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  --glass-shadow-hover: 0 32px 80px rgba(0, 0, 0, 0.55), 0 0 40px rgba(94, 234, 212, 0.08);
+
+  /* Typography */
+  --font-display: "SF Pro Display", "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+
+  --text-display: clamp(2.75rem, 6vw, 4.5rem);
+  --text-h1: clamp(1.85rem, 3.5vw, 2.75rem);
+  --text-h2: clamp(1.35rem, 2.5vw, 1.75rem);
+  --text-h3: 1.125rem;
+  --text-body: 1rem;
+  --text-sm: 0.875rem;
+  --text-xs: 0.75rem;
+
+  /* Motion */
+  --motion-fast: 150ms;
+  --motion-normal: 280ms;
+  --motion-slow: 480ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Layout */
+  --max: 1180px;
+  --header-h: 72px;
+  --nav-pad: 0.45rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-normal: 0ms;
+    --motion-slow: 0ms;
+  }
+}

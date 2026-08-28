@@ -77,6 +77,44 @@ window.HochuApp = (() => {
     return `<span class="${cls}">${escapeHtml(label)}</span>`;
   }
 
+  function projectCard(p) {
+    const desc = escapeHtml((p.description || "").slice(0, 140));
+    return `
+      <a class="item glass-card project-card" href="/project.html?id=${p.id}">
+        <div class="row" style="justify-content:space-between;align-items:flex-start">
+          <div class="item__title">${escapeHtml(p.title)}</div>
+          ${statusBadge(PROJECT_STATUS, p.status, true)}
+        </div>
+        ${desc ? `<p class="item__desc">${desc}${(p.description || "").length > 140 ? "…" : ""}</p>` : ""}
+        <div class="item__meta">
+          <span class="item__budget">${money(p.budgetAmount, p.currency)}</span>
+          <span>до ${escapeHtml(p.deadline)}</span>
+          <span>${escapeHtml(p.category?.name || "")}</span>
+        </div>
+        <div class="item__footer">
+          <span class="muted" style="font-size:var(--text-xs);font-family:var(--font-mono)">ID ${String(p.id).slice(0, 8)}…</span>
+          <span class="btn btn-ghost" style="padding:0.4rem 0.9rem;font-size:var(--text-xs)">Открыть →</span>
+        </div>
+      </a>`;
+  }
+
+  function serviceCard(s) {
+    return `
+      <div class="item glass-card engineer-card">
+        <div class="avatar">${escapeHtml((s.title || "У").charAt(0).toUpperCase())}</div>
+        <div class="item__title">${escapeHtml(s.title)}</div>
+        <p class="item__desc">${escapeHtml((s.description || "").slice(0, 100))}</p>
+        <div class="item__meta" style="justify-content:center;margin-top:var(--space-3)">
+          <span class="badge badge--accent">${escapeHtml(s.category?.name || "Услуга")}</span>
+          <span class="item__budget">${money(s.price)}</span>
+          <span>${s.deliveryDays} дн.</span>
+        </div>
+        <div style="margin-top:var(--space-4)">
+          <span class="availability">Доступна</span>
+        </div>
+      </div>`;
+  }
+
   function escapeHtml(str) {
     return String(str ?? "")
       .replaceAll("&", "&amp;")
@@ -122,23 +160,31 @@ window.HochuApp = (() => {
         <button type="button" class="linkish" id="logout-btn">Выйти</button>`
       : `
         <a href="/login.html" data-nav="login">Войти</a>
-        <a class="btn btn-primary" href="/register.html" style="padding:0.4rem 0.8rem">Регистрация</a>`;
+        <a class="btn btn-primary" href="/register.html" style="padding:0.45rem 1rem">Регистрация</a>`;
 
     header.innerHTML = `
       <div class="site-header__inner">
-        <a class="brand" href="/">Хочу Проект</a>
-        <nav class="nav">
+        <a class="brand" href="/">
+          <span class="brand__mark" aria-hidden="true"></span>
+          <span>Хочу Проект</span>
+        </a>
+        <nav class="nav" aria-label="Основная навигация">
           <a href="/projects.html" data-nav="projects">Проекты</a>
           <a href="/services.html" data-nav="services">Услуги</a>
           ${authLinks}
         </nav>
       </div>`;
 
-    footer.innerHTML = `<div class="wrap">Инженерная биржа компетенций · MVP · <a href="/terms.html">Соглашение</a> · <a href="/privacy.html">Конфиденциальность</a></div>`;
+    footer.innerHTML = `
+      <div class="wrap">
+        Инженерная биржа компетенций ·
+        <a href="/terms.html">Соглашение</a> ·
+        <a href="/privacy.html">Конфиденциальность</a>
+      </div>`;
 
     if (active) {
       header.querySelectorAll(`[data-nav="${active}"]`).forEach((el) => {
-        el.style.color = "var(--accent)";
+        el.classList.add("is-active");
       });
     }
 
@@ -153,6 +199,8 @@ window.HochuApp = (() => {
         }
       });
     }
+
+    if (window.HochuEffects) HochuEffects.init();
   }
 
   function setBusy(btn, busy, label) {
@@ -204,6 +252,8 @@ window.HochuApp = (() => {
     requireAuthOrRedirect,
     setBusy,
     dealNextAction,
-    daysSince
+    daysSince,
+    projectCard,
+    serviceCard
   };
 })();
