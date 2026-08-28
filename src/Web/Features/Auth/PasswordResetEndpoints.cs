@@ -1,11 +1,13 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Options;
 using System.Text;
 using Web.Common.Endpoints;
 using Web.Common.Errors;
 using Web.Common.Validation;
 using Web.Domain.Entities;
+using Web.Infrastructure.Email;
 
 namespace Web.Features.Auth;
 
@@ -37,6 +39,8 @@ public class PasswordResetEndpoints : IEndpoint
             ForgotPasswordRequest request,
             IValidator<ForgotPasswordRequest> validator,
             UserManager<ApplicationUser> userManager,
+            IEmailService email,
+            IOptions<AppOptions> appOptions,
             IHostEnvironment env,
             ILogger<PasswordResetEndpoints> logger,
             CancellationToken ct) =>
@@ -47,9 +51,18 @@ public class PasswordResetEndpoints : IEndpoint
             {
                 var token = await userManager.GeneratePasswordResetTokenAsync(user);
                 var encoded = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
-                logger.LogInformation("Password reset token generated for {Email}", request.Email);
+                var link = $"{appOptions.Value.PublicBaseUrl.TrimEnd('/')}/reset-password.html?email={Uri.EscapeDataString(request.Email)}&token={encoded}";
                 if (env.IsDevelopment())
-                    logger.LogWarning("Dev-only password reset token for {Email}: {Token}", request.Email, encoded);
+                    logger.LogWarning("Dev-only password reset link for {Email}: {Link}", request.Email, link);
+                try
+                {
+                    await email.SendAsync(request.Email, "Сброс пароля — Хочу Проект",
+                        $"<p>Чтобы сбросить пароль, перейдите по ссылке:</p><p><a href=\"{link}\">Сбросить пароль</a></p>", ct);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to send password reset email to {Email}", request.Email);
+                }
             }
 
             return Results.Ok(new { message = "If the email exists, a reset link was generated." });
@@ -77,7 +90,7 @@ public class PasswordResetEndpoints : IEndpoint
 
             var result = await userManager.ResetPasswordAsync(user, decoded, request.NewPassword);
             if (!result.Succeeded)
-                throw AppErrors.BadRequest(string.Join("; ", result.Errors.Select(e => e.Description)));
+                throw AppErrors.BadRequest("Invalid or expired reset token.");
 
             return Results.Ok(new { message = "Password updated." });
         });

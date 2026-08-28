@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Web.Common.Auth;
 using Web.Common.Endpoints;
 using Web.Common.Errors;
 using Web.Domain.Entities;
@@ -38,7 +39,10 @@ builder.Services
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(AdminRoles.Admin, policy => policy.RequireRole(AdminRoles.Admin));
+});
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -126,6 +130,7 @@ using (var scope = app.Services.CreateScope())
     {
         await db.Database.MigrateAsync();
         await DbSeeder.SeedAsync(db);
+        await RoleSeeder.SeedAsync(scope.ServiceProvider, app.Configuration);
     }
 }
 

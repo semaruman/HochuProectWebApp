@@ -5,6 +5,7 @@ using Web.Features.Deals;
 using Web.Features.Reviews;
 using Web.Infrastructure.Audit;
 using Web.Infrastructure.DomainEvents;
+using Web.Infrastructure.Email;
 using Web.Infrastructure.Files;
 using Web.Infrastructure.Notifications;
 using Web.Infrastructure.Payments;
@@ -27,6 +28,13 @@ public static class MarketplaceServiceCollectionExtensions
             throw new InvalidOperationException($"Unsupported payment provider '{provider}'.");
         services.AddScoped<IPaymentService, StubPaymentService>();
 
+        services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+        services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
+        if (configuration.GetValue<bool>($"{EmailOptions.SectionName}:Enabled"))
+            services.AddSingleton<IEmailService, SmtpEmailService>();
+        else
+            services.AddSingleton<IEmailService, LoggingEmailService>();
+
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<INotificationService, NotificationService>();
 
@@ -36,6 +44,7 @@ public static class MarketplaceServiceCollectionExtensions
         services.AddScoped<SubmitWorkHandler>();
         services.AddScoped<AcceptWorkHandler>();
         services.AddScoped<CancelDealHandler>();
+        services.AddScoped<RequestRevisionHandler>();
         services.AddScoped<CreateReviewHandler>();
 
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
@@ -44,6 +53,7 @@ public static class MarketplaceServiceCollectionExtensions
         services.AddScoped<IDomainEventHandler<BidAccepted>>(sp => sp.GetRequiredService<MarketplaceEventHandler>());
         services.AddScoped<IDomainEventHandler<DealFunded>>(sp => sp.GetRequiredService<MarketplaceEventHandler>());
         services.AddScoped<IDomainEventHandler<WorkSubmitted>>(sp => sp.GetRequiredService<MarketplaceEventHandler>());
+        services.AddScoped<IDomainEventHandler<WorkRevisionRequested>>(sp => sp.GetRequiredService<MarketplaceEventHandler>());
         services.AddScoped<IDomainEventHandler<DealCompleted>>(sp => sp.GetRequiredService<MarketplaceEventHandler>());
         services.AddScoped<IDomainEventHandler<DealCancelled>>(sp => sp.GetRequiredService<MarketplaceEventHandler>());
 

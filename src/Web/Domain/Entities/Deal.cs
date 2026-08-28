@@ -22,6 +22,8 @@ public class Deal : Entity
     public DateTime? SubmittedAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
     public DateTime? CancelledAt { get; private set; }
+    public DateTime? RevisionRequestedAt { get; private set; }
+    public string? LastRevisionComment { get; private set; }
     public long RowVersion { get; private set; }
 
     public Project Project { get; private set; } = null!;
@@ -34,8 +36,11 @@ public class Deal : Entity
     public ICollection<Review> Reviews { get; private set; } = new List<Review>();
 
     public bool IsParticipant(Guid userId) => userId == BuyerId || userId == SellerId;
-    public bool IsFunded => Status == DealStatus.InProgress && FundedAt is not null;
+    public bool IsWorkStarted => Status is DealStatus.InProgress or DealStatus.Submitted or DealStatus.RevisionRequired;
+    public bool IsFunded => FundedAt is not null && IsWorkStarted;
     public bool IsCompleted => Status == DealStatus.Completed;
+    public bool CanSubmitWork => Status is DealStatus.InProgress or DealStatus.RevisionRequired;
+    public bool AwaitingBuyerReview => Status == DealStatus.Submitted;
 
     public static Deal FromAcceptedBid(Project project, Bid bid, DateTime utcNow)
     {
@@ -50,8 +55,9 @@ public class Deal : Entity
             BuyerId = project.BuyerId,
             SellerId = bid.SellerId,
             Amount = bid.Price,
-            Status = DealStatus.Created,
-            CreatedAt = utcNow
+            Status = DealStatus.InProgress,
+            CreatedAt = utcNow,
+            FundedAt = utcNow
         };
         deal.Conversation = Conversation.Open(deal.Id, utcNow);
         return deal;
@@ -59,6 +65,8 @@ public class Deal : Entity
 
     public void Fund(DateTime utcNow)
     {
+        if (Status == DealStatus.InProgress && FundedAt is not null)
+            return;
         if (Status != DealStatus.Created)
             throw new DomainException("Only created deals can be funded.");
         Status = DealStatus.InProgress;
@@ -68,13 +76,27 @@ public class Deal : Entity
 
     public DealDeliverable SubmitWork(string? message, DateTime utcNow)
     {
-        if (Status != DealStatus.InProgress)
-            throw new DomainException("Only in-progress deals can be submitted.");
+        if (!CanSubmitWork)
+            throw new DomainException("Deal is not ready for work submission.");
         Status = DealStatus.Submitted;
         SubmittedAt = utcNow;
+        RevisionRequestedAt = null;
+        LastRevisionComment = null;
         var deliverable = DealDeliverable.Create(Id, message, utcNow);
         Raise(new WorkSubmitted(Id, BuyerId, SellerId, deliverable.Id, utcNow));
         return deliverable;
+    }
+
+    public void RequestRevision(string comment, DateTime utcNow)
+    {
+        if (Status != DealStatus.Submitted)
+            throw new DomainException("Only submitted deals can be returned for revision.");
+        if (string.IsNullOrWhiteSpace(comment) || comment.Trim().Length < 5)
+            throw new DomainException("Revision comment is too short.");
+        Status = DealStatus.RevisionRequired;
+        RevisionRequestedAt = utcNow;
+        LastRevisionComment = comment.Trim();
+        Raise(new WorkRevisionRequested(Id, BuyerId, SellerId, LastRevisionComment, utcNow));
     }
 
     public void Accept(DateTime utcNow)

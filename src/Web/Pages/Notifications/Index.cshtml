@@ -1,0 +1,33 @@
+@page
+@model Web.Pages.Notifications.IndexModel
+@{
+    ViewData["Title"] = "Уведомления";
+}
+
+<div class="flex justify-between items-center mb-6">
+    <h1 class="font-display text-3xl font-bold text-steel">Уведомления</h1>
+    <form method="post" asp-page-handler="ReadAll">
+        <button class="text-accent font-semibold" type="submit">Прочитать все</button>
+    </form>
+</div>
+
+<div class="space-y-3">
+@foreach (var n in Model.Items)
+{
+    <div class="card-quiet rounded-lg p-4 @(n.IsRead ? "opacity-70" : "")">
+        <div class="flex justify-between gap-3">
+            <h2 class="font-semibold">@n.Title</h2>
+            <span class="text-xs text-slate-500">@n.CreatedAt.ToLocalTime().ToString("g")</span>
+        </div>
+        <p class="text-slate-700">@n.Body</p>
+        @if (!string.IsNullOrEmpty(n.LinkUrl))
+        {
+            <a class="text-accent text-sm font-semibold" href="@n.LinkUrl">Открыть</a>
+        }
+    </div>
+}
+@if (!Model.Items.Any())
+{
+    <p class="text-slate-500">Пока тихо.</p>
+}
+</div>

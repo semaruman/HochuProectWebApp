@@ -25,6 +25,10 @@
           <label class="label" for="password">Пароль</label>
           <input class="input" id="password" type="password" required minlength="8" autocomplete="new-password" />
         </div>
+        <label class="hint" style="display:flex;gap:0.5rem;align-items:flex-start;margin-bottom:1rem">
+          <input type="checkbox" id="acceptTerms" required style="margin-top:0.2rem" />
+          <span>Я принимаю <a href="/terms.html" target="_blank">Пользовательское соглашение</a> и ознакомлен(а) с <a href="/privacy.html" target="_blank">Политикой конфиденциальности</a>.</span>
+        </label>
         <p class="error-text" id="error" hidden></p>
         <button class="btn btn-primary" style="width:100%" type="submit" id="submit">Создать аккаунт</button>
         <p class="muted" style="margin-top:1rem">Уже есть аккаунт? <a href="/login.html">Войти</a></p>
@@ -41,14 +45,24 @@
         e.preventDefault();
         const error = document.getElementById("error");
         const btn = document.getElementById("submit");
+        if (!document.getElementById("acceptTerms").checked) {
+          error.textContent = "Необходимо принять соглашение и политику конфиденциальности.";
+          error.hidden = false;
+          return;
+        }
         error.hidden = true;
         HochuApp.setBusy(btn, true);
         try {
-          await HochuApi.register(
+          const res = await HochuApi.register(
             document.getElementById("email").value.trim(),
             document.getElementById("password").value,
-            document.getElementById("displayName").value.trim()
+            document.getElementById("displayName").value.trim(),
+            true
           );
+          if (res.message) {
+            location.href = "/verify-email-sent.html";
+            return;
+          }
           location.href = "/projects.html";
         } catch (err) {
           error.textContent = err.message;

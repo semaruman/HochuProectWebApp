@@ -1,0 +1,41 @@
+@page
+@model Web.Pages.Projects.CreateModel
+@{
+    ViewData["Title"] = "Новый проект";
+}
+
+<div class="max-w-2xl mx-auto card-quiet rounded-xl p-6 space-y-4">
+    <h1 class="font-display text-2xl font-bold text-steel">Создать проект</h1>
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <p class="text-red-600 text-sm">@Model.Error</p>
+    }
+    <form method="post" class="space-y-3">
+        <div>
+            <label class="label" asp-for="Input.Title">Название</label>
+            <input class="input" asp-for="Input.Title" />
+        </div>
+        <div>
+            <label class="label" asp-for="Input.Description">Описание</label>
+            <textarea class="input" rows="6" asp-for="Input.Description"></textarea>
+        </div>
+        <div>
+            <label class="label" asp-for="Input.CategoryId">Категория</label>
+            <select class="input" asp-for="Input.CategoryId" asp-items="Model.Categories"></select>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-3">
+            <div>
+                <label class="label" asp-for="Input.BudgetAmount">Бюджет, ₽</label>
+                <input class="input" asp-for="Input.BudgetAmount" type="number" step="1" min="1" />
+            </div>
+            <div>
+                <label class="label" asp-for="Input.Deadline">Срок</label>
+                <input class="input" asp-for="Input.Deadline" type="date" />
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button class="btn-primary" type="submit" name="action" value="draft">Сохранить черновик</button>
+            <button class="rounded-md border border-accent text-accent px-4 py-2 font-semibold" type="submit" name="action" value="publish">Опубликовать</button>
+        </div>
+    </form>
+</div>

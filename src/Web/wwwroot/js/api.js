@@ -52,8 +52,8 @@ window.HochuApi = {
     return this.post("/api/auth/login", { email, password });
   },
 
-  register(email, password, displayName) {
-    return this.post("/api/auth/register", { email, password, displayName });
+  register(email, password, displayName, acceptTerms = true) {
+    return this.post("/api/auth/register", { email, password, displayName, acceptTerms });
   },
 
   logout() {

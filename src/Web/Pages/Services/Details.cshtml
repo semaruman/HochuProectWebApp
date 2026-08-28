@@ -1,0 +1,20 @@
+@page "{id:guid}"
+@model Web.Pages.Services.DetailsModel
+@{
+    ViewData["Title"] = Model.Service?.Title ?? "Услуга";
+}
+
+@if (Model.Service is null)
+{
+    <p>Услуга не найдена.</p>
+}
+else
+{
+    <article class="card-quiet rounded-xl p-6 space-y-3 max-w-3xl">
+        <h1 class="font-display text-3xl font-bold text-steel">@Model.Service.Title</h1>
+        <p class="text-slate-500">@Model.Service.CategoryName · @Model.Service.DeliveryDays дн.</p>
+        <p class="text-accent font-bold text-xl">@Model.Service.Price.ToString("N0") ₽</p>
+        <p class="whitespace-pre-wrap text-slate-700">@Model.Service.Description</p>
+        <a class="text-accent font-semibold" href="/Profiles/@Model.Service.SellerId">Профиль исполнителя</a>
+    </article>
+}

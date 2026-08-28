@@ -172,6 +172,9 @@ namespace Web.Infrastructure.Persistence.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsBlocked")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
 
@@ -195,8 +198,14 @@ namespace Web.Infrastructure.Persistence.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("PrivacyPolicyAcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
+
+                    b.Property<DateTime?>("TermsAcceptedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
@@ -372,8 +381,15 @@ namespace Web.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("FundedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("LastRevisionComment")
+                        .HasMaxLength(5000)
+                        .HasColumnType("character varying(5000)");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RevisionRequestedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<long>("RowVersion")
                         .IsConcurrencyToken()

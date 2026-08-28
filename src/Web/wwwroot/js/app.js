@@ -5,24 +5,28 @@ window.HochuApp = (() => {
     2: "В работе",
     3: "Завершён",
     4: "Отменён",
+    5: "Скрыт",
     Draft: "Черновик",
     Published: "Опубликован",
     InProgress: "В работе",
     Completed: "Завершён",
-    Cancelled: "Отменён"
+    Cancelled: "Отменён",
+    Hidden: "Скрыт"
   };
 
   const DEAL_STATUS = {
     0: "Создана",
     1: "В работе",
-    2: "На проверке",
+    2: "Работа сдана",
     3: "Завершена",
     4: "Отменена",
+    5: "Нужна доработка",
     Created: "Создана",
     InProgress: "В работе",
-    Submitted: "На проверке",
+    Submitted: "Работа сдана",
     Completed: "Завершена",
-    Cancelled: "Отменена"
+    Cancelled: "Отменена",
+    RevisionRequired: "Нужна доработка"
   };
 
   const BID_STATUS = {
@@ -130,7 +134,7 @@ window.HochuApp = (() => {
         </nav>
       </div>`;
 
-    footer.innerHTML = `<div class="wrap">Инженерная биржа компетенций · MVP</div>`;
+    footer.innerHTML = `<div class="wrap">Инженерная биржа компетенций · MVP · <a href="/terms.html">Соглашение</a> · <a href="/privacy.html">Конфиденциальность</a></div>`;
 
     if (active) {
       header.querySelectorAll(`[data-nav="${active}"]`).forEach((el) => {
@@ -158,6 +162,32 @@ window.HochuApp = (() => {
     btn.textContent = busy ? "…" : (btn.dataset.label || label || btn.textContent);
   }
 
+  function dealNextAction(deal, userId) {
+    const s = deal.status;
+    const isBuyer = userId === deal.buyerId;
+    const isSeller = userId === deal.sellerId;
+    if (s === 1 || s === "InProgress") {
+      if (isSeller) return "Загрузите результат и нажмите «Сдать работу».";
+      return "Ожидайте сдачу работы от исполнителя.";
+    }
+    if (s === 5 || s === "RevisionRequired") {
+      if (isSeller) return `Нужна доработка: ${deal.lastRevisionComment || "см. комментарий заказчика"}`;
+      return "Ожидайте повторную сдачу от исполнителя.";
+    }
+    if (s === 2 || s === "Submitted") {
+      const since = deal.submittedAt ? `Сдана ${formatDate(deal.submittedAt)}.` : "";
+      if (isBuyer) return `${since} Проверьте файлы и примите работу или верните на доработку.`;
+      return `${since} Ожидайте проверки заказчиком.`;
+    }
+    if (s === 3 || s === "Completed") return "Сделка завершена. Можно оставить отзыв.";
+    return "";
+  }
+
+  function daysSince(dateStr) {
+    if (!dateStr) return 0;
+    return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+  }
+
   return {
     PROJECT_STATUS,
     DEAL_STATUS,
@@ -172,6 +202,8 @@ window.HochuApp = (() => {
     refreshAuth,
     getUserId,
     requireAuthOrRedirect,
-    setBusy
+    setBusy,
+    dealNextAction,
+    daysSince
   };
 })();

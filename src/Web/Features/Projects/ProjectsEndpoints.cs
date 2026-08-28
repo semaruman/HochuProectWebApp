@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Web.Common.Auth;
 using Web.Common.Endpoints;
@@ -63,10 +64,12 @@ public class ProjectsEndpoints : IEndpoint
             CreateProjectRequest request,
             IValidator<CreateProjectRequest> validator,
             ICurrentUser currentUser,
+            UserManager<ApplicationUser> userManager,
             AppDbContext db,
             CancellationToken ct) =>
         {
             await validator.ValidateOrThrowAsync(request, ct);
+            await AccountGuards.RequireActiveUserAsync(userManager, currentUser.UserId, ct: ct);
             if (!await db.Categories.AnyAsync(c => c.Id == request.CategoryId, ct))
                 throw AppErrors.BadRequest("Category not found.");
 

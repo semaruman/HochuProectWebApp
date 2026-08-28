@@ -1,0 +1,38 @@
+@page
+@model Web.Pages.Projects.IndexModel
+@{
+    ViewData["Title"] = "Проекты";
+}
+
+<div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+    <div>
+        <h1 class="font-display text-3xl font-bold text-steel">Проекты</h1>
+        <p class="text-slate-600">Открытые инженерные задачи на бирже</p>
+    </div>
+    <a class="btn-primary" href="/Projects/Create">Создать проект</a>
+</div>
+
+<form method="get" class="grid md:grid-cols-3 gap-3 mb-6">
+    <input class="input" name="q" value="@Model.Q" placeholder="Поиск..." />
+    <select class="input" name="categoryId" asp-for="CategoryId" asp-items="Model.CategoryOptions">
+        <option value="">Все категории</option>
+    </select>
+    <button class="btn-primary" type="submit">Найти</button>
+</form>
+
+<div class="space-y-3">
+@foreach (var p in Model.Projects)
+{
+    <a href="/Projects/Details/@p.Id" class="block card-quiet rounded-lg p-4 hover:border-accent transition">
+        <div class="flex justify-between gap-3">
+            <h2 class="font-semibold text-lg">@p.Title</h2>
+            <span class="text-accent font-bold">@p.BudgetAmount.ToString("N0") ₽</span>
+        </div>
+        <p class="text-sm text-slate-600 mt-1">@p.CategoryName · срок до @p.Deadline.ToString("dd.MM.yyyy")</p>
+    </a>
+}
+@if (!Model.Projects.Any())
+{
+    <p class="text-slate-500">Пока нет опубликованных проектов.</p>
+}
+</div>

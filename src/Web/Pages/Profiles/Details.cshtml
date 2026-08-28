@@ -1,0 +1,36 @@
+@page "{id:guid}"
+@model Web.Pages.Profiles.DetailsModel
+@{
+    ViewData["Title"] = Model.Profile?.DisplayName ?? "Профиль";
+}
+
+@if (Model.Profile is null)
+{
+    <p>Профиль не найден.</p>
+}
+else
+{
+    <article class="card-quiet rounded-xl p-6 space-y-4 max-w-3xl">
+        <h1 class="font-display text-3xl font-bold text-steel">@Model.Profile.DisplayName</h1>
+        <p class="text-slate-500">Рейтинг: @(Model.Profile.AverageRating?.ToString("0.0") ?? "—") (@Model.Profile.ReviewCount отзывов)</p>
+        <p class="whitespace-pre-wrap">@(Model.Profile.Bio ?? "Пока без описания.")</p>
+        <div>
+            <h2 class="font-semibold mb-2">Навыки</h2>
+            <p>@(Model.Skills.Any() ? string.Join(", ", Model.Skills) : "Не указаны")</p>
+        </div>
+        <div>
+            <h2 class="font-semibold mb-2">Отзывы</h2>
+            @foreach (var r in Model.Reviews)
+            {
+                <div class="border-t py-3">
+                    <p class="font-semibold">@r.Rating / 5 · @r.AuthorName</p>
+                    <p class="text-slate-700">@r.Comment</p>
+                </div>
+            }
+            @if (!Model.Reviews.Any())
+            {
+                <p class="text-slate-500">Отзывов пока нет.</p>
+            }
+        </div>
+    </article>
+}

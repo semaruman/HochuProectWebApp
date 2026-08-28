@@ -1,0 +1,28 @@
+@page
+@model Web.Pages.Services.IndexModel
+@{
+    ViewData["Title"] = "Услуги";
+}
+
+<div class="flex justify-between items-end mb-6 gap-3">
+    <div>
+        <h1 class="font-display text-3xl font-bold text-steel">Каталог услуг</h1>
+        <p class="text-slate-600">Готовые инженерные услуги от исполнителей</p>
+    </div>
+    <a class="btn-primary" href="/Services/Create">Добавить услугу</a>
+</div>
+
+<div class="grid md:grid-cols-2 gap-4">
+@foreach (var s in Model.Services)
+{
+    <a href="/Services/Details/@s.Id" class="card-quiet rounded-lg p-4 hover:border-accent block">
+        <h2 class="font-semibold text-lg">@s.Title</h2>
+        <p class="text-sm text-slate-600">@s.CategoryName · @s.DeliveryDays дн.</p>
+        <p class="text-accent font-bold mt-2">@s.Price.ToString("N0") ₽</p>
+    </a>
+}
+</div>
+@if (!Model.Services.Any())
+{
+    <p class="text-slate-500 mt-4">Пока нет опубликованных услуг.</p>
+}

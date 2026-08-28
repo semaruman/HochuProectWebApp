@@ -7,6 +7,7 @@ using Web.Infrastructure.Persistence;
 namespace Web.Features.Deals;
 
 public record SubmitWorkRequest(string? Message);
+public record RequestRevisionRequest(string Comment);
 
 public class DealsEndpoints : IEndpoint
 {
@@ -62,6 +63,8 @@ public class DealsEndpoints : IEndpoint
                 deal.SubmittedAt,
                 deal.CompletedAt,
                 deal.CancelledAt,
+                deal.RevisionRequestedAt,
+                deal.LastRevisionComment,
                 deal.Deliverables.Select(d => new DealDeliverableDto(
                     d.Id,
                     d.Message,
@@ -115,6 +118,17 @@ public class DealsEndpoints : IEndpoint
             return Results.Ok(result);
         });
 
+        group.MapPost("/{id:guid}/request-revision", async (
+            Guid id,
+            RequestRevisionRequest request,
+            ICurrentUser currentUser,
+            RequestRevisionHandler handler,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(id, currentUser.UserId, request.Comment, ct);
+            return Results.Ok(result);
+        }).RequireAuthorization();
+
         group.MapPost("/{id:guid}/cancel", async (
             Guid id,
             ICurrentUser currentUser,
@@ -155,6 +169,8 @@ public sealed record DealDetailsDto(
     DateTime? SubmittedAt,
     DateTime? CompletedAt,
     DateTime? CancelledAt,
+    DateTime? RevisionRequestedAt,
+    string? LastRevisionComment,
     IReadOnlyList<DealDeliverableDto> Deliverables);
 
 public sealed record DealDeliverableDto(Guid Id, string? Message, DateTime CreatedAt, IReadOnlyList<DealFileDto> Files);

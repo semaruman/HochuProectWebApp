@@ -5,6 +5,7 @@ using Web.Domain.Events;
 using Web.Domain.Exceptions;
 using Web.Domain.ValueObjects;
 using Web.Features.Bids;
+using Web.Features.Auth;
 using Web.Features.Projects;
 
 namespace Web.UnitTests;
@@ -88,11 +89,12 @@ public class DomainStateMachineTests
         deal.SellerId.Should().Be(sellerId);
         deal.Amount.Should().Be(9_000);
         deal.Conversation.Should().NotBeNull();
+        deal.Status.Should().Be(DealStatus.InProgress);
         project.DomainEvents.OfType<BidAccepted>().Should().ContainSingle(e => e.DealId == deal.Id);
     }
 
     [Fact]
-    public void Deal_Fund_Submit_Accept_HappyPath()
+    public void Deal_BetaFlow_Submit_Revision_Accept()
     {
         var project = DraftProject();
         project.Publish(Now);
@@ -101,16 +103,21 @@ public class DomainStateMachineTests
         project.MarkInProgress(Now);
         var deal = project.RecordAcceptedBid(bid, [], Now);
 
-        deal.Fund(Now);
         deal.Status.Should().Be(DealStatus.InProgress);
-        deal.DomainEvents.OfType<DealFunded>().Should().ContainSingle();
+        deal.FundedAt.Should().NotBeNull();
 
         var deliverable = deal.SubmitWork("Готово", Now.AddHours(1));
         deal.Status.Should().Be(DealStatus.Submitted);
         deliverable.DealId.Should().Be(deal.Id);
         deal.DomainEvents.OfType<WorkSubmitted>().Should().ContainSingle();
 
-        deal.Accept(Now.AddHours(2));
+        deal.RequestRevision("Нужно поправить чертёж по допускам", Now.AddHours(2));
+        deal.Status.Should().Be(DealStatus.RevisionRequired);
+
+        deal.SubmitWork("Исправлено", Now.AddHours(3));
+        deal.Status.Should().Be(DealStatus.Submitted);
+
+        deal.Accept(Now.AddHours(4));
         deal.Status.Should().Be(DealStatus.Completed);
         deal.DomainEvents.OfType<DealCompleted>().Should().ContainSingle();
     }
@@ -146,6 +153,15 @@ public class DomainStateMachineTests
 
 public class ValidatorTests
 {
+    [Fact]
+    public async Task RegisterValidator_RejectsMissingTerms()
+    {
+        var validator = new RegisterValidator();
+        var result = await validator.ValidateAsync(new RegisterRequest(
+            "user@test.local", "Password1", "User", AcceptTerms: false));
+        result.IsValid.Should().BeFalse();
+    }
+
     [Fact]
     public async Task CreateProjectValidator_RejectsShortTitle()
     {

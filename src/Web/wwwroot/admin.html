@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Админ — Хочу Проект</title>
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+  <main class="main">
+    <div class="wrap">
+      <div class="page-head"><h1>Админ-панель</h1></div>
+      <div class="toolbar">
+        <button class="btn btn-ghost" data-tab="users">Пользователи</button>
+        <button class="btn btn-ghost" data-tab="projects">Проекты</button>
+      </div>
+      <div id="content" class="list"><div class="skeleton"></div></div>
+    </div>
+  </main>
+  <footer class="site-footer" id="site-footer"></footer>
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    async function loadUsers() {
+      const users = await HochuApi.get("/api/admin/users");
+      document.getElementById("content").innerHTML = users.map(u => `
+        <div class="item">
+          <div class="item__title">${HochuApp.escapeHtml(u.displayName || u.email)}</div>
+          <div class="item__meta">
+            <span>${HochuApp.escapeHtml(u.email)}</span>
+            <span>${u.emailConfirmed ? "email ✓" : "email ?"}</span>
+            <span>${u.isBlocked ? "заблокирован" : "активен"}</span>
+          </div>
+          <div class="row" style="margin-top:0.5rem">
+            <button class="btn btn-ghost" data-block="${u.id}" data-action="${u.isBlocked ? "unblock" : "block"}">
+              ${u.isBlocked ? "Разблокировать" : "Заблокировать"}
+            </button>
+          </div>
+        </div>`).join("");
+      document.querySelectorAll("[data-block]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.block;
+          const path = btn.dataset.action === "block" ? "block" : "unblock";
+          await HochuApi.post(`/api/admin/users/${id}/${path}`);
+          await loadUsers();
+        });
+      });
+    }
+
+    async function loadProjects() {
+      const projects = await HochuApi.get("/api/admin/projects");
+      document.getElementById("content").innerHTML = projects.map(p => `
+        <div class="item">
+          <div class="item__title">${HochuApp.escapeHtml(p.title)}</div>
+          <div class="item__meta">
+            ${HochuApp.statusBadge(HochuApp.PROJECT_STATUS, p.status)}
+            <span>${HochuApp.formatDate(p.createdAt)}</span>
+          </div>
+          <div class="row" style="margin-top:0.5rem">
+            ${p.status !== 5 && p.status !== "Hidden" ? `<button class="btn btn-ghost" data-hide="${p.id}">Скрыть</button>` : ""}
+            ${p.status === 5 || p.status === "Hidden" ? `<button class="btn btn-ghost" data-restore="${p.id}">Вернуть</button>` : ""}
+            <a class="btn btn-ghost" href="/project.html?id=${p.id}">Открыть</a>
+          </div>
+        </div>`).join("");
+      document.querySelectorAll("[data-hide]").forEach(btn => btn.addEventListener("click", async () => {
+        await HochuApi.post(`/api/admin/projects/${btn.dataset.hide}/hide`);
+        await loadProjects();
+      }));
+      document.querySelectorAll("[data-restore]").forEach(btn => btn.addEventListener("click", async () => {
+        await HochuApi.post(`/api/admin/projects/${btn.dataset.restore}/restore`);
+        await loadProjects();
+      }));
+    }
+
+    (async () => {
+      await HochuApp.mountShell();
+      if (!HochuApp.requireAuthOrRedirect()) return;
+      try {
+        await HochuApi.get("/api/admin/users");
+      } catch {
+        document.getElementById("content").innerHTML = `<div class="empty">Доступ запрещён. Нужна роль Admin.</div>`;
+        return;
+      }
+      document.querySelectorAll("[data-tab]").forEach(btn => btn.addEventListener("click", () => {
+        if (btn.dataset.tab === "users") loadUsers();
+        else loadProjects();
+      }));
+      await loadUsers();
+    })();
+  </script>
+</body>
+</html>

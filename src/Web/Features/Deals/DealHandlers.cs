@@ -24,15 +24,14 @@ public sealed class FundDealHandler(
 {
     public async Task<DealActionResult> HandleAsync(Guid dealId, Guid buyerId, CancellationToken ct)
     {
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-
         var deal = await db.Deals.FirstOrDefaultAsync(d => d.Id == dealId, ct)
             ?? throw AppErrors.NotFound();
         if (deal.BuyerId != buyerId)
             throw AppErrors.Forbidden();
-        if (deal.IsFunded)
+        if (deal.IsWorkStarted)
             return new DealActionResult(deal.Id, deal.Status, deal.FundedAt, deal.CompletedAt, Idempotent: true);
 
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         var utcNow = DateTime.UtcNow;
         var paymentResult = await payments.CreateAndAuthorizeAsync(deal.Id, deal.Amount, ct);
         if (!paymentResult.Success)
@@ -145,5 +144,22 @@ public sealed class CancelDealHandler(AppDbContext db, IPaymentService payments,
         await db.SaveAndDispatchAsync(dispatcher, ct);
         await tx.CommitAsync(ct);
         return new DealActionResult(deal.Id, deal.Status, deal.FundedAt, deal.CompletedAt);
+    }
+}
+
+public sealed record RequestRevisionResult(Guid Id, DealStatus Status, string Comment);
+
+public sealed class RequestRevisionHandler(AppDbContext db, IDomainEventDispatcher dispatcher)
+{
+    public async Task<RequestRevisionResult> HandleAsync(Guid dealId, Guid buyerId, string comment, CancellationToken ct)
+    {
+        var deal = await db.Deals.FirstOrDefaultAsync(d => d.Id == dealId, ct)
+            ?? throw AppErrors.NotFound();
+        if (deal.BuyerId != buyerId)
+            throw AppErrors.Forbidden();
+
+        deal.RequestRevision(comment, DateTime.UtcNow);
+        await db.SaveAndDispatchAsync(dispatcher, ct);
+        return new RequestRevisionResult(deal.Id, deal.Status, deal.LastRevisionComment ?? comment);
     }
 }

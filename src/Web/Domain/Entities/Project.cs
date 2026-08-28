@@ -119,7 +119,23 @@ public class Project : Entity
         UpdatedAt = utcNow;
     }
 
-    public bool CanAttachFiles() => Status is not (ProjectStatus.Completed or ProjectStatus.Cancelled);
+    public void Hide(DateTime utcNow)
+    {
+        if (Status is ProjectStatus.Completed or ProjectStatus.Cancelled)
+            throw new DomainException("Project cannot be hidden in its current status.");
+        Status = ProjectStatus.Hidden;
+        UpdatedAt = utcNow;
+    }
+
+    public void RestorePublication(DateTime utcNow)
+    {
+        if (Status != ProjectStatus.Hidden)
+            throw new DomainException("Only hidden projects can be restored.");
+        Status = ProjectStatus.Published;
+        UpdatedAt = utcNow;
+    }
+
+    public bool CanAttachFiles() => Status is not (ProjectStatus.Completed or ProjectStatus.Cancelled or ProjectStatus.Hidden);
 
     public Deal RecordAcceptedBid(Bid bid, IReadOnlyCollection<Bid> otherPending, DateTime utcNow)
     {

@@ -1,0 +1,68 @@
+@page "{id:guid}"
+@model Web.Pages.Projects.DetailsModel
+@{
+    ViewData["Title"] = Model.Project?.Title ?? "Проект";
+}
+
+@if (Model.Project is null)
+{
+    <p>Проект не найден.</p>
+}
+else
+{
+    <div class="space-y-6">
+        <div class="card-quiet rounded-xl p-6">
+            <div class="flex flex-wrap justify-between gap-3">
+                <h1 class="font-display text-3xl font-bold text-steel">@Model.Project.Title</h1>
+                <span class="text-accent font-bold text-xl">@Model.Project.BudgetAmount.ToString("N0") ₽</span>
+            </div>
+            <p class="text-sm text-slate-500 mt-2">@Model.Project.CategoryName · @Model.Project.Status · до @Model.Project.Deadline.ToString("dd.MM.yyyy")</p>
+            <p class="mt-4 whitespace-pre-wrap text-slate-700">@Model.Project.Description</p>
+            @if (Model.IsOwner)
+            {
+                <div class="mt-4 flex flex-wrap gap-2">
+                    @if (Model.Project.Status == Web.Domain.Enums.ProjectStatus.Draft)
+                    {
+                        <form method="post" asp-page-handler="Publish">
+                            <input type="hidden" name="id" value="@Model.Project.Id" />
+                            <button class="btn-primary" type="submit">Опубликовать</button>
+                        </form>
+                    }
+                    @if (Model.Project.Status is Web.Domain.Enums.ProjectStatus.Draft or Web.Domain.Enums.ProjectStatus.Published)
+                    {
+                        <a class="rounded-md border px-3 py-2 font-semibold" href="/Projects/Bids/@Model.Project.Id">Отклики</a>
+                    }
+                </div>
+            }
+        </div>
+
+        @if (Model.CanBid)
+        {
+            <div class="card-quiet rounded-xl p-6 space-y-3">
+                <h2 class="font-display text-xl font-bold">Откликнуться</h2>
+                @if (!string.IsNullOrEmpty(Model.Error))
+                {
+                    <p class="text-red-600 text-sm">@Model.Error</p>
+                }
+                <form method="post" asp-page-handler="Bid" class="space-y-3">
+                    <input type="hidden" name="id" value="@Model.Project.Id" />
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="label">Цена, ₽</label>
+                            <input class="input" name="price" type="number" min="1" required />
+                        </div>
+                        <div>
+                            <label class="label">Срок, дней</label>
+                            <input class="input" name="estimatedDays" type="number" min="1" required />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label">Сопроводительное письмо</label>
+                        <textarea class="input" name="coverLetter" rows="4" required minlength="20"></textarea>
+                    </div>
+                    <button class="btn-primary" type="submit">Отправить отклик</button>
+                </form>
+            </div>
+        }
+    </div>
+}

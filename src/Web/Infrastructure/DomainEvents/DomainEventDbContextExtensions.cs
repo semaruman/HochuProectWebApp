@@ -21,7 +21,7 @@ public static class DomainEventDbContextExtensions
             })
             .ToList();
 
-        await dispatcher.DispatchAsync(events, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await dispatcher.DispatchAsync(events, cancellationToken);
     }
 }

@@ -1,0 +1,28 @@
+@page
+@model Web.Pages.Account.RegisterModel
+@{
+    ViewData["Title"] = "Регистрация";
+}
+
+<div class="max-w-md mx-auto card-quiet rounded-xl p-6 space-y-4">
+    <h1 class="font-display text-2xl font-bold text-steel">Регистрация</h1>
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <p class="text-red-600 text-sm">@Model.Error</p>
+    }
+    <form method="post" class="space-y-3">
+        <div>
+            <label class="label" asp-for="Input.DisplayName">Имя</label>
+            <input class="input" asp-for="Input.DisplayName" />
+        </div>
+        <div>
+            <label class="label" asp-for="Input.Email">Email</label>
+            <input class="input" asp-for="Input.Email" type="email" />
+        </div>
+        <div>
+            <label class="label" asp-for="Input.Password">Пароль</label>
+            <input class="input" asp-for="Input.Password" type="password" />
+        </div>
+        <button class="btn-primary w-full" type="submit">Создать аккаунт</button>
+    </form>
+</div>

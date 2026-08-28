@@ -1,0 +1,109 @@
+@page "{id:guid}"
+@model Web.Pages.Deals.DetailsModel
+@{
+    ViewData["Title"] = "Сделка";
+}
+
+@if (Model.Deal is null)
+{
+    <p>Сделка не найдена.</p>
+}
+else
+{
+    <div class="grid lg:grid-cols-2 gap-6">
+        <section class="card-quiet rounded-xl p-6 space-y-4">
+            <h1 class="font-display text-2xl font-bold text-steel">@Model.Deal.ProjectTitle</h1>
+            <p>Статус: <strong>@Model.Deal.Status</strong></p>
+            <p>Сумма: <strong>@Model.Deal.Amount.ToString("N0") ₽</strong></p>
+            @if (!string.IsNullOrEmpty(Model.Error))
+            {
+                <p class="text-red-600 text-sm">@Model.Error</p>
+            }
+            <div class="flex flex-wrap gap-2">
+                @if (Model.IsBuyer && Model.Deal.Status == Web.Domain.Enums.DealStatus.Created)
+                {
+                    <form method="post" asp-page-handler="Fund"><button class="btn-primary" type="submit">Зарезервировать оплату</button></form>
+                }
+                @if (Model.IsSeller && Model.Deal.Status == Web.Domain.Enums.DealStatus.InProgress)
+                {
+                    <form method="post" asp-page-handler="Submit" class="w-full space-y-2">
+                        <textarea class="input" name="message" rows="3" placeholder="Комментарий к результату"></textarea>
+                        <button class="btn-primary" type="submit">Сдать работу</button>
+                    </form>
+                }
+                @if (Model.IsBuyer && Model.Deal.Status == Web.Domain.Enums.DealStatus.Submitted)
+                {
+                    <form method="post" asp-page-handler="Accept"><button class="btn-primary" type="submit">Принять работу</button></form>
+                }
+                @if (Model.Deal.Status is not (Web.Domain.Enums.DealStatus.Completed or Web.Domain.Enums.DealStatus.Cancelled))
+                {
+                    <form method="post" asp-page-handler="Cancel"><button class="rounded-md border px-3 py-2" type="submit">Отменить</button></form>
+                }
+            </div>
+
+            @if (Model.Deal.Status == Web.Domain.Enums.DealStatus.Completed)
+            {
+                <form method="post" asp-page-handler="Review" class="space-y-2 border-t pt-4">
+                    <h2 class="font-semibold">Оставить отзыв</h2>
+                    <input class="input" type="number" min="1" max="5" name="rating" required placeholder="Оценка 1-5" />
+                    <textarea class="input" name="comment" rows="3" required minlength="5" placeholder="Комментарий"></textarea>
+                    <button class="btn-primary" type="submit">Отправить отзыв</button>
+                </form>
+            }
+        </section>
+
+        <section class="card-quiet rounded-xl p-6 flex flex-col min-h-[28rem]">
+            <h2 class="font-display text-xl font-bold mb-3">Чат</h2>
+            <div id="chat-messages" class="flex-1 overflow-y-auto space-y-2 mb-3 text-sm"></div>
+            <form id="chat-form" class="flex gap-2">
+                <input id="chat-text" class="input" maxlength="4000" placeholder="Сообщение..." required />
+                <button class="btn-primary" type="submit">Отправить</button>
+            </form>
+        </section>
+    </div>
+}
+
+@section Scripts {
+<script>
+(() => {
+  const dealId = '@Model.Deal?.Id';
+  if (!dealId) return;
+  const box = document.getElementById('chat-messages');
+  const form = document.getElementById('chat-form');
+  const input = document.getElementById('chat-text');
+  let afterId = null;
+  const me = '@Model.CurrentUserId';
+
+  async function load() {
+    const url = afterId
+      ? `/api/deals/${dealId}/messages?afterId=${afterId}&take=50`
+      : `/api/deals/${dealId}/messages?take=50`;
+    const messages = await HochuApi.request(url);
+    for (const m of messages) {
+      const el = document.createElement('div');
+      el.className = m.senderId === me ? 'text-right' : 'text-left';
+      el.innerHTML = `<span class="inline-block rounded-lg px-3 py-2 ${m.senderId === me ? 'bg-teal-100' : 'bg-slate-100'}">${m.text.replace(/</g,'&lt;')}</span>`;
+      box.appendChild(el);
+      afterId = m.id;
+    }
+    box.scrollTop = box.scrollHeight;
+    await HochuApi.request(`/api/deals/${dealId}/messages/read`, { method: 'POST', body: '{}' });
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    await HochuApi.request(`/api/deals/${dealId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ text })
+    });
+    input.value = '';
+    await load();
+  });
+
+  load();
+  setInterval(load, 4000);
+})();
+</script>
+}

@@ -31,6 +31,13 @@ public sealed record WorkSubmitted(
     Guid DeliverableId,
     DateTime OccurredOn) : IDomainEvent;
 
+public sealed record WorkRevisionRequested(
+    Guid DealId,
+    Guid BuyerId,
+    Guid SellerId,
+    string Comment,
+    DateTime OccurredOn) : IDomainEvent;
+
 public sealed record DealCompleted(
     Guid DealId,
     Guid BuyerId,

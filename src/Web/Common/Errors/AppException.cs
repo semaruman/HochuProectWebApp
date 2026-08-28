@@ -31,4 +31,7 @@ public static class AppErrors
 
     public static AppException BadRequest(string message)
         => new(StatusCodes.Status400BadRequest, message, "Bad Request");
+
+    public static AppException Unauthorized(string message = "Authentication required.")
+        => new(StatusCodes.Status401Unauthorized, message, "Unauthorized");
 }

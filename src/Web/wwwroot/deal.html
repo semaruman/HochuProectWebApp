@@ -19,6 +19,14 @@
   <script>
     const id = HochuApp.qs("id");
 
+    function renderFiles(files) {
+      if (!files?.length) return `<span class="muted">Файлов нет</span>`;
+      return files.map(f => `
+        <a class="btn btn-ghost" style="margin:0.25rem 0.25rem 0 0" href="/api/files/deliverable-files/${f.id}" download>
+          Скачать ${HochuApp.escapeHtml(f.fileName)}
+        </a>`).join("");
+    }
+
     async function loadMessages(userId) {
       const box = document.getElementById("chat");
       if (!box) return;
@@ -45,16 +53,16 @@
         const isBuyer = userId === deal.buyerId;
         const isSeller = userId === deal.sellerId;
         const status = deal.status;
+        const next = HochuApp.dealNextAction(deal, userId);
+        const waitingDays = (status === 2 || status === "Submitted") ? HochuApp.daysSince(deal.submittedAt) : 0;
 
         let actions = "";
-        if (isBuyer && (status === 0 || status === "Created")) {
-          actions += `<button class="btn btn-primary" id="fund" type="button">Зарезервировать оплату</button>`;
-        }
-        if (isSeller && (status === 1 || status === "InProgress")) {
+        if (isSeller && (status === 1 || status === "InProgress" || status === 5 || status === "RevisionRequired")) {
           actions += `<button class="btn btn-primary" id="submit-work" type="button">Сдать работу</button>`;
         }
         if (isBuyer && (status === 2 || status === "Submitted")) {
           actions += `<button class="btn btn-primary" id="accept-work" type="button">Принять работу</button>`;
+          actions += `<button class="btn btn-ghost" id="request-revision" type="button">Вернуть на доработку</button>`;
         }
         if ((isBuyer || isSeller) && status !== 3 && status !== "Completed" && status !== 4 && status !== "Cancelled") {
           actions += `<button class="btn btn-danger" id="cancel" type="button">Отменить</button>`;
@@ -64,19 +72,24 @@
           <div class="item">
             <div class="item__title">Сдача ${HochuApp.formatDate(d.createdAt)}</div>
             <p class="muted" style="margin:0;white-space:pre-wrap">${HochuApp.escapeHtml(d.message || "Без комментария")}</p>
+            <div class="row" style="margin-top:0.5rem">${renderFiles(d.files)}</div>
           </div>`).join("") || `<div class="empty">Сдач пока нет.</div>`;
 
         root.innerHTML = `
           <div class="page-head">
             <div>
               <h1>${HochuApp.escapeHtml(deal.projectTitle)}</h1>
-              <p>${HochuApp.statusBadge(HochuApp.DEAL_STATUS, deal.status)} · ${HochuApp.money(deal.amount)}</p>
+              <p>${HochuApp.statusBadge(HochuApp.DEAL_STATUS, deal.status, true)} · ${HochuApp.money(deal.amount)}</p>
             </div>
             <div class="row">
               <a class="btn btn-ghost" href="/deals.html">К сделкам</a>
               <a class="btn btn-ghost" href="/project.html?id=${deal.projectId}">Проект</a>
               ${actions}
             </div>
+          </div>
+          <div class="panel" style="margin-bottom:1rem">
+            <p class="muted" style="margin:0"><strong>Следующий шаг:</strong> ${HochuApp.escapeHtml(next)}</p>
+            ${waitingDays >= 3 ? `<p class="hint" style="margin:0.5rem 0 0">Работа ожидает проверки уже ${waitingDays} дн. Если возникли вопросы — напишите в чат.</p>` : ""}
           </div>
           <div class="split split-2">
             <div class="stack">
@@ -109,19 +122,24 @@
                 <h3>Детали</h3>
                 <div class="item__meta">
                   <span>Создана: ${HochuApp.formatDate(deal.createdAt)}</span>
-                  <span>Оплачена: ${HochuApp.formatDate(deal.fundedAt)}</span>
+                  <span>Начата: ${HochuApp.formatDate(deal.fundedAt)}</span>
                   <span>Сдана: ${HochuApp.formatDate(deal.submittedAt)}</span>
                   <span>Завершена: ${HochuApp.formatDate(deal.completedAt)}</span>
                   <span>Вы: ${isBuyer ? "заказчик" : isSeller ? "исполнитель" : "участник"}</span>
                 </div>
+                ${deal.lastRevisionComment ? `<p class="hint" style="margin-top:0.75rem"><strong>Комментарий к доработке:</strong> ${HochuApp.escapeHtml(deal.lastRevisionComment)}</p>` : ""}
               </div>
               <div class="panel">
                 <h3>Результаты</h3>
                 <div class="list">${deliverables}</div>
-                ${(isSeller && (status === 1 || status === "InProgress")) ? `
+                ${(isSeller && (status === 1 || status === "InProgress" || status === 5 || status === "RevisionRequired")) ? `
                 <div class="field" style="margin-top:1rem">
                   <label class="label" for="submit-msg">Комментарий к сдаче</label>
                   <textarea class="textarea" id="submit-msg" placeholder="Кратко опишите, что сдаёте"></textarea>
+                </div>
+                <div class="field">
+                  <label class="label" for="submit-files">Файлы (до 5)</label>
+                  <input class="input" id="submit-files" type="file" multiple />
                 </div>` : ""}
               </div>
             </div>
@@ -141,11 +159,21 @@
           }
         });
 
-        document.getElementById("fund")?.addEventListener("click", async (e) => {
+        document.getElementById("submit-work")?.addEventListener("click", async (e) => {
           HochuApp.setBusy(e.currentTarget, true);
           try {
-            await HochuApi.post(`/api/deals/${id}/fund`);
-            HochuApp.toast("Оплата зарезервирована");
+            const files = document.getElementById("submit-files")?.files;
+            if (files?.length) {
+              const fd = new FormData();
+              fd.append("message", document.getElementById("submit-msg")?.value?.trim() || "Работа сдана");
+              for (const f of files) fd.append("files", f);
+              await HochuApi.request(`/api/deals/${id}/submit`, { method: "POST", body: fd });
+            } else {
+              await HochuApi.post(`/api/deals/${id}/submit`, {
+                message: document.getElementById("submit-msg")?.value?.trim() || "Работа сдана"
+              });
+            }
+            HochuApp.toast("Работа отправлена на проверку");
             await load();
           } catch (err) {
             HochuApp.toast(err.message, true);
@@ -153,17 +181,18 @@
           }
         });
 
-        document.getElementById("submit-work")?.addEventListener("click", async (e) => {
-          HochuApp.setBusy(e.currentTarget, true);
+        document.getElementById("request-revision")?.addEventListener("click", async () => {
+          const comment = prompt("Что нужно исправить? (минимум 5 символов)");
+          if (!comment || comment.trim().length < 5) {
+            HochuApp.toast("Укажите комментарий для доработки", true);
+            return;
+          }
           try {
-            await HochuApi.post(`/api/deals/${id}/submit`, {
-              message: document.getElementById("submit-msg")?.value?.trim() || "Работа сдана"
-            });
-            HochuApp.toast("Работа отправлена на проверку");
+            await HochuApi.post(`/api/deals/${id}/request-revision`, { comment: comment.trim() });
+            HochuApp.toast("Работа возвращена на доработку");
             await load();
           } catch (err) {
             HochuApp.toast(err.message, true);
-            HochuApp.setBusy(e.currentTarget, false);
           }
         });
 

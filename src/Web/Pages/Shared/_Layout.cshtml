@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] — Хочу Проект</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ink: '#0f172a',
+                        steel: '#1e3a5f',
+                        accent: '#0d9488',
+                        sand: '#f0f4f8'
+                    },
+                    fontFamily: {
+                        display: ['"Manrope"', 'system-ui', 'sans-serif'],
+                        body: ['"Source Sans 3"', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body class="min-h-screen bg-sand text-ink font-body">
+    <header class="border-b border-slate-200/80 bg-white/80 backdrop-blur sticky top-0 z-20">
+        <div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-4">
+            <a href="/" class="font-display font-extrabold text-xl tracking-tight text-steel">Хочу Проект</a>
+            <nav class="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
+                <a class="hover:text-accent" href="/Projects">Проекты</a>
+                <a class="hover:text-accent" href="/Services">Услуги</a>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <a class="hover:text-accent" href="/Deals">Сделки</a>
+                    <a class="hover:text-accent" href="/Notifications">Уведомления</a>
+                    <a class="hover:text-accent" href="/Profiles/Me">Профиль</a>
+                    <form method="post" asp-page="/Account/Logout" class="inline">
+                        <button type="submit" class="hover:text-accent">Выйти</button>
+                    </form>
+                }
+                else
+                {
+                    <a class="hover:text-accent" href="/Account/Login">Войти</a>
+                    <a class="rounded-md bg-accent px-3 py-1.5 text-white hover:bg-teal-700" href="/Account/Register">Регистрация</a>
+                }
+            </nav>
+        </div>
+    </header>
+    <main class="mx-auto max-w-6xl px-4 py-8">
+        @RenderBody()
+    </main>
+    <footer class="border-t border-slate-200 mt-12 py-6 text-center text-sm text-slate-500">
+        Инженерная биржа компетенций · MVP
+    </footer>
+    <script src="~/js/site.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

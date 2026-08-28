@@ -1,0 +1,29 @@
+@page
+@model Web.Pages.Profiles.MeModel
+@{
+    ViewData["Title"] = "Мой профиль";
+}
+
+<div class="max-w-2xl mx-auto card-quiet rounded-xl p-6 space-y-4">
+    <h1 class="font-display text-2xl font-bold text-steel">Мой профиль</h1>
+    <form method="post" class="space-y-3">
+        <div>
+            <label class="label" asp-for="Input.DisplayName">Имя</label>
+            <input class="input" asp-for="Input.DisplayName" />
+        </div>
+        <div>
+            <label class="label" asp-for="Input.Bio">О себе</label>
+            <textarea class="input" rows="4" asp-for="Input.Bio"></textarea>
+        </div>
+        <div>
+            <label class="label" asp-for="Input.Skills">Навыки (через запятую)</label>
+            <input class="input" asp-for="Input.Skills" />
+        </div>
+        <button class="btn-primary" type="submit">Сохранить</button>
+    </form>
+    @if (Model.Profile is not null)
+    {
+        <p class="text-sm text-slate-500">Рейтинг: @(Model.Profile.AverageRating?.ToString("0.0") ?? "—") (@Model.Profile.ReviewCount)</p>
+        <a class="text-accent font-semibold" href="/Profiles/@Model.Profile.UserId">Публичная страница</a>
+    }
+</div>

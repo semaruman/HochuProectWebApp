@@ -121,6 +121,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.LastRevisionComment).HasMaxLength(5000);
             e.Property(x => x.RowVersion).IsConcurrencyToken();
             e.HasIndex(x => x.ProjectId).IsUnique();
             e.HasIndex(x => x.BidId).IsUnique();

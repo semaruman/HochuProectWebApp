@@ -1,0 +1,23 @@
+@page
+@model Web.Pages.Deals.IndexModel
+@{
+    ViewData["Title"] = "Сделки";
+}
+
+<h1 class="font-display text-3xl font-bold text-steel mb-6">Мои сделки</h1>
+<div class="space-y-3">
+@foreach (var d in Model.Deals)
+{
+    <a href="/Deals/Details/@d.Id" class="block card-quiet rounded-lg p-4 hover:border-accent">
+        <div class="flex justify-between gap-3">
+            <h2 class="font-semibold">@d.ProjectTitle</h2>
+            <span>@d.Status</span>
+        </div>
+        <p class="text-sm text-slate-600">@d.Amount.ToString("N0") ₽</p>
+    </a>
+}
+@if (!Model.Deals.Any())
+{
+    <p class="text-slate-500">Сделок пока нет.</p>
+}
+</div>

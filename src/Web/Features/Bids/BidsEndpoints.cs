@@ -1,9 +1,11 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Web.Common.Auth;
 using Web.Common.Endpoints;
 using Web.Common.Errors;
 using Web.Common.Validation;
+using Web.Domain.Entities;
 using Web.Domain.ValueObjects;
 using Web.Infrastructure.Persistence;
 
@@ -41,10 +43,12 @@ public class BidsEndpoints : IEndpoint
             CreateBidRequest request,
             IValidator<CreateBidRequest> validator,
             ICurrentUser currentUser,
+            UserManager<ApplicationUser> userManager,
             CreateBidHandler handler,
             CancellationToken ct) =>
         {
             await validator.ValidateOrThrowAsync(request, ct);
+            await AccountGuards.RequireActiveUserAsync(userManager, currentUser.UserId, ct: ct);
             var bid = await handler.HandleAsync(
                 projectId, currentUser.UserId, request.Price, request.EstimatedDays, request.CoverLetter, ct);
             return Results.Created($"/api/bids/{bid.Id}", bid);
