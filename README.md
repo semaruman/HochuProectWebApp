@@ -2,6 +2,11 @@
 
 Engineering freelance marketplace MVP — a monolithic ASP.NET Core application that connects buyers with technical freelancers through a structured project → bid → deal workflow. The system enforces domain rules (state machines, concurrency, participant checks) in code rather than in the UI, and ships with a closed-beta feature set: auth, deal lifecycle, chat, file deliverables, reviews, admin moderation, and in-app/email notifications — without real payment processing.
 
+<div>
+  <img width="1872" height="979" alt="image" src="https://github.com/user-attachments/assets/7eefadd7-2ded-4604-98f8-01a18a83f90f" />
+
+</div>
+
 ---
 
 ## Key features
